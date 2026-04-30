@@ -121,13 +121,22 @@ export default function App() {
   useEffect(() => {
     if (phase !== 'leaderboard') return;
     setLeaderboardLoading(true);
+    
     supabase
       .from('game_scores')
       .select('*, profiles(full_name)')
       .order('score', { ascending: false })
       .limit(20)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching leaderboard:', error);
+        }
         setLeaderboardData((data as GameScore[]) || []);
+      })
+      .catch(err => {
+        console.error('Leaderboard error:', err);
+      })
+      .finally(() => {
         setLeaderboardLoading(false);
       });
   }, [phase]);
@@ -1143,8 +1152,8 @@ export default function App() {
                     <Trophy size={24} className="text-warning" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font- bold italic font-serif">Ranking</h2>
-                    <p className="text-xs text-ink-muted font-mono uppercase tracking-widest">Top Expedicionistas</p>
+                    <h2 className="text-2xl font-bold italic font-serif">Ranking</h2>
+                    <p className="text-[10px] text-ink-muted font-mono uppercase tracking-[0.2em]">Top Expedicionistas</p>
                   </div>
                 </div>
                 <button
