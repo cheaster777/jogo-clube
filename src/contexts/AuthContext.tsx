@@ -124,10 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Sign out
   const signOut = async () => {
+    setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setSession(null);
+    setLoading(false);
   };
 
   // Reset password

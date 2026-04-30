@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Trophy, 
@@ -120,25 +120,28 @@ export default function App() {
   // Fetch leaderboard when entering leaderboard phase
   useEffect(() => {
     if (phase !== 'leaderboard') return;
+    let cancelled = false;
     setLeaderboardLoading(true);
-    
-    supabase
-      .from('game_scores')
-      .select('*, profiles(full_name)')
-      .order('score', { ascending: false })
-      .limit(20)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Error fetching leaderboard:', error);
-        }
+
+    const fetchLeaderboard = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('game_scores')
+          .select('*, profiles(full_name)')
+          .order('score', { ascending: false })
+          .limit(20);
+        if (cancelled) return;
+        if (error) console.error('Leaderboard fetch error:', error);
         setLeaderboardData((data as GameScore[]) || []);
-      })
-      .catch(err => {
-        console.error('Leaderboard error:', err);
-      })
-      .finally(() => {
-        setLeaderboardLoading(false);
-      });
+      } catch (err) {
+        if (!cancelled) console.error('Leaderboard error:', err);
+      } finally {
+        if (!cancelled) setLeaderboardLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+    return () => { cancelled = true; };
   }, [phase]);
   useEffect(() => {
     setPlayerNames(prev => {
@@ -1073,40 +1076,14 @@ export default function App() {
                 })}
               </div>
 
-              {/* Water Quality Table */}
-              <div className="mb-10 card overflow-hidden shadow-sm">
-                <div className="bg-ink text-white px-4 py-2.5 text-xs font-mono uppercase tracking-widest text-center rounded-t-lg">
-                  Tabela de Referência: Qualidade da Água (BMWP)
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="border-b border-border bg-surface-alt">
-                        <th className="px-4 py-2.5 font-bold uppercase text-ink-secondary">Classe</th>
-                        <th className="px-4 py-2.5 font-bold uppercase text-ink-secondary">BMWP</th>
-                        <th className="px-4 py-2.5 font-bold uppercase text-ink-secondary">Categoria</th>
-                        <th className="px-4 py-2.5 font-bold uppercase text-ink-secondary">Diagnóstico</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {WATER_QUALITY_DATA.map((q, i) => (
-                        <tr key={i} className="hover:bg-surface-alt transition-colors">
-                          <td className="px-4 py-3 font-mono">{q.class}</td>
-                          <td className="px-4 py-3 font-bold">{q.range}</td>
-                          <td className="px-4 py-3">
-                            <span 
-                              className="px-2 py-0.5 rounded-md text-white font-bold text-xs"
-                              style={{ backgroundColor: q.color }}
-                            >
-                              {q.category}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 italic font-serif">{q.diagnosis}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              {/* Water Quality hint link to rules */}
+              <div className="mb-8">
+                <button
+                  onClick={() => setShowRules(true)}
+                  className="text-xs font-mono text-ink-muted hover:text-accent transition-colors underline underline-offset-2"
+                >
+                  Ver tabela completa de qualidade da água (BMWP) →
+                </button>
               </div>
 
               {scoreSaved && (
