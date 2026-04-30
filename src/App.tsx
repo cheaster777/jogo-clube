@@ -7,18 +7,19 @@ import {
   Play, 
   Info, 
   AlertTriangle, 
-  ShieldCheck,
-  ChevronRight,
-  User,
-  Layers,
-  Zap,
-  Instagram,
-  X,
-  Leaf,
-  Droplets,
-  BookOpen,
-  ArrowLeft,
-  LogOut
+  ShieldCheck, 
+  ChevronRight, 
+  User, 
+  Layers, 
+  Zap, 
+  Instagram, 
+  X, 
+  Leaf, 
+  Droplets, 
+  BookOpen, 
+  ArrowLeft, 
+  LogOut,
+  Medal
 } from 'lucide-react';
 import { 
   FAMILY_CARDS_DATA, 
@@ -29,6 +30,8 @@ import {
 } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
+import { supabase } from './lib/supabase';
+import { GameScore } from './contexts/AuthContext';
 
 // Helper to get water quality
 const getWaterQuality = (score: number) => {
@@ -55,7 +58,7 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
-type GamePhase = 'home' | 'setup' | 'playing' | 'action' | 'gameOver';
+type GamePhase = 'home' | 'setup' | 'playing' | 'action' | 'gameOver' | 'leaderboard';
 
 interface Player {
   id: number;
@@ -83,6 +86,8 @@ export default function App() {
   const [scoreSaved, setScoreSaved] = useState(false);
 
   const [showRules, setShowRules] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<GameScore[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   // Auto-fill player 1 name from Supabase profile
   useEffect(() => {
@@ -112,7 +117,20 @@ export default function App() {
     }
   }, [phase, user, scoreSaved, players, saveGameScore]);
 
-  // Update player names and bot flags when number of players changes
+  // Fetch leaderboard when entering leaderboard phase
+  useEffect(() => {
+    if (phase !== 'leaderboard') return;
+    setLeaderboardLoading(true);
+    supabase
+      .from('game_scores')
+      .select('*, profiles(full_name)')
+      .order('score', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        setLeaderboardData((data as GameScore[]) || []);
+        setLeaderboardLoading(false);
+      });
+  }, [phase]);
   useEffect(() => {
     setPlayerNames(prev => {
       const newNames = [...prev];
@@ -450,6 +468,13 @@ export default function App() {
                       id="btn-how-to-play"
                     >
                       Como Jogar
+                    </button>
+                    <button
+                      onClick={() => setPhase('leaderboard')}
+                      className="btn btn-secondary btn-lg"
+                      id="btn-leaderboard"
+                    >
+                      <Medal size={18} /> Ranking
                     </button>
                     <button
                       onClick={() => {
@@ -1099,6 +1124,109 @@ export default function App() {
                   id="btn-go-home"
                 >
                   Voltar ao Início
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ==================== LEADERBOARD ==================== */}
+          {phase === 'leaderboard' && (
+            <motion.div
+              key="leaderboard"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-2xl mx-auto"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-warning-light flex items-center justify-center rounded-xl">
+                    <Trophy size={24} className="text-warning" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font- bold italic font-serif">Ranking</h2>
+                    <p className="text-xs text-ink-muted font-mono uppercase tracking-widest">Top Expedicionistas</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPhase('home')}
+                  className="p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+              </div>
+
+              {leaderboardLoading ? (
+                <div className="card p-8 text-center">
+                  <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-ink-muted font-mono text-sm">Carregando ranking...</p>
+                </div>
+              ) : leaderboardData.length === 0 ? (
+                <div className="card p-8 text-center">
+                  <p className="text-ink-muted">Nenhuma expedição registrada ainda. Seja o primeiro!</p>
+                  <button
+                    onClick={() => setPhase('setup')}
+                    className="btn btn-primary mt-4"
+                  >
+                    Começar Expedição
+                  </button>
+                </div>
+              ) : (
+                <div className="card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-surface-alt border-b border-border">
+                        <tr>
+                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">#</th>
+                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Jogador</th>
+                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Pontos</th>
+                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Qualidade</th>
+                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Data</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {leaderboardData.map((entry, idx) => {
+                          const quality = getWaterQuality(entry.score);
+                          return (
+                            <tr
+                              key={entry.id}
+                              className={`hover:bg-surface-alt transition-colors ${idx === 0 ? 'bg-warning-light/30' : ''}`}
+                            >
+                              <td className="px-4 py-3">
+                                <span className={`font-mono font-bold ${idx < 3 ? 'text-warning' : 'text-ink-muted'}`}>
+                                  #{idx + 1}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-serif italic font-semibold">
+                                {(entry as GameScore & { profiles: { full_name: string } }).profiles?.full_name || 'Anônimo'}
+                              </td>
+                              <td className="px-4 py-3 font-mono font-bold">{entry.score}</td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className="px-2 py-0.5 rounded-md text-white font-bold text-xs"
+                                  style={{ backgroundColor: quality.color }}
+                                >
+                                  {quality.category}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs text-ink-muted">
+                                {new Date(entry.played_at).toLocaleDateString('pt-BR')}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setPhase('setup')}
+                  className="btn btn-primary btn-lg"
+                  id="btn-play-from-leaderboard"
+                >
+                  <Play size={18} fill="currentColor" /> Jogar Agora
                 </button>
               </div>
             </motion.div>
