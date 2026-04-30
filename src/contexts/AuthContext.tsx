@@ -41,34 +41,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen for auth state changes
   useEffect(() => {
-    let resolved = false;
+    const timeout = setTimeout(() => setLoading(false), 5000);
+    let mounted = true;
 
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
 
-      if (session?.user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        if (profileData) {
-          setProfile(profileData as Profile);
+        if (session?.user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          if (mounted && profileData) {
+            setProfile(profileData as Profile);
+          }
         }
+      } catch {
+        if (mounted) setUser(null);
       }
-
-      if (!resolved) {
-        resolved = true;
-        setLoading(false);
-      }
+      if (mounted) setLoading(false);
+      clearTimeout(timeout);
     };
 
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!mounted) return;
         setSession(session);
         setUser(session?.user ?? null);
         try {
@@ -78,24 +82,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select('*')
               .eq('id', session.user.id)
               .single();
-            if (profileData) {
+            if (mounted && profileData) {
               setProfile(profileData as Profile);
             }
           } else {
             setProfile(null);
           }
         } catch {
-          // profile fetch failed — app still renders
-        } finally {
-          if (!resolved) {
-            resolved = true;
-            setLoading(false);
-          }
+          if (mounted) setUser(null);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Sign up with email + password + full name
