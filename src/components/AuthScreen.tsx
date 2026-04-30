@@ -55,7 +55,7 @@ export default function AuthScreen() {
     if (error) {
       setError(translateError(error.message));
     } else {
-      setSuccess('Conta criada com sucesso! Verifique seu email para confirmar o cadastro.');
+      setSuccess('Conta criada! Antes de entrar, confirme seu email — enviamos um link para a sua caixa de entrada.');
     }
     setLoading(false);
   };
@@ -174,7 +174,7 @@ export default function AuthScreen() {
                     </div>
                   </div>
                   <div>
-                    <label className="label block mb-1.5">Senha</label>
+                    <label htmlFor="login-password" className="label block mb-1.5">Senha</label>
                     <div className="relative">
                       <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
@@ -225,7 +225,7 @@ export default function AuthScreen() {
               {mode === 'signup' && !success && (
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div>
-                    <label className="label block mb-1.5">Nome Completo</label>
+                    <label htmlFor="signup-name" className="label block mb-1.5">Nome Completo</label>
                     <div className="relative">
                       <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
@@ -241,7 +241,7 @@ export default function AuthScreen() {
                     </div>
                   </div>
                   <div>
-                    <label className="label block mb-1.5">Email</label>
+                    <label htmlFor="signup-email" className="label block mb-1.5">Email</label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input

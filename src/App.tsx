@@ -139,21 +139,6 @@ export default function App() {
     });
   }, [numPlayers]);
 
-  // Auth gate: show login screen if not authenticated
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-ink-muted font-mono text-sm">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthScreen />;
-  }
 
   // Initialize Game
   const initGame = () => {
@@ -331,6 +316,21 @@ export default function App() {
     setLastAction(null);
     setActionMessage('');
   }, [familyDeck.length, actionDeck.length, currentPlayerIndex, players.length, currentRound]);
+  // Auth gate: show login screen if not authenticated
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-ink-muted font-mono text-sm">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-bg text-ink font-sans selection:bg-accent selection:text-white">
