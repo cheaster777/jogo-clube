@@ -9,3 +9,8 @@ coverage/
 
 # Local Netlify folder
 .netlify
+
+# Debug / test scripts (local only)
+test-*.mjs
+test-*.txt
+screenshot.png
