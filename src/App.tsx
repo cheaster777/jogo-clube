@@ -112,22 +112,6 @@ export default function App() {
     }
   }, [phase, user, scoreSaved, players, saveGameScore]);
 
-  // Auth gate: show login screen if not authenticated
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-ink-muted font-mono text-sm">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthScreen />;
-  }
-
   // Update player names and bot flags when number of players changes
   useEffect(() => {
     setPlayerNames(prev => {
@@ -146,7 +130,7 @@ export default function App() {
       const newFlags = [...prev];
       if (newFlags.length < numPlayers) {
         for (let i = newFlags.length; i < numPlayers; i++) {
-          newFlags.push(i > 0); // Default: first is human, others are bots
+          newFlags.push(i > 0);
         }
       } else if (newFlags.length > numPlayers) {
         return newFlags.slice(0, numPlayers);
@@ -154,6 +138,22 @@ export default function App() {
       return newFlags;
     });
   }, [numPlayers]);
+
+  // Auth gate: show login screen if not authenticated
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-ink-muted font-mono text-sm">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
 
   // Initialize Game
   const initGame = () => {
