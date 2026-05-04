@@ -148,13 +148,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     if (!user) return;
 
-    await supabase.from('game_scores').insert({
+    const { error } = await supabase.from('game_scores').insert({
       user_id: user.id,
       score,
       quality_category: qualityCategory,
       quality_diagnosis: qualityDiagnosis,
       families_count: familiesCount,
     });
+
+    if (error) console.error('Failed to save score:', error.message);
   };
 
   return (
