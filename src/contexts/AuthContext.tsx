@@ -139,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  // Save game score
+  // Save game score — throws on failure so caller can show error UI
   const saveGameScore = async (
     score: number,
     qualityCategory: string,
@@ -156,7 +156,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       families_count: familiesCount,
     });
 
-    if (error) console.error('Failed to save score:', error.message);
+    if (error) {
+      console.error('Failed to save score:', error.message);
+      throw new Error(error.message);
+    }
   };
 
   return (

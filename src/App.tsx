@@ -88,6 +88,7 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<GameScore[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   // Auto-fill player 1 name from Supabase profile
   useEffect(() => {
@@ -102,19 +103,26 @@ export default function App() {
 
   // Save score when game ends
   useEffect(() => {
-    if (phase === 'gameOver' && user && !scoreSaved) {
-      const currentPlayer = players.find(p => !p.isBot);
-      if (currentPlayer) {
-        const quality = getWaterQuality(currentPlayer.score);
-        saveGameScore(
-          currentPlayer.score,
-          quality.category,
-          quality.diagnosis,
-          currentPlayer.hand.length
-        );
-        setScoreSaved(true);
-      }
-    }
+    if (phase !== 'gameOver' || !user || scoreSaved) return;
+
+    const humanPlayer = players.find(p => !p.isBot);
+    if (!humanPlayer) return;
+
+    const doSave = async () => {
+      const quality = getWaterQuality(humanPlayer.score);
+      await saveGameScore(
+        humanPlayer.score,
+        quality.category,
+        quality.diagnosis,
+        humanPlayer.hand.length
+      );
+      setScoreSaved(true);
+    };
+
+    doSave().catch(err => {
+      console.error('Score save failed:', err);
+      setSaveError(true);
+    });
   }, [phase, user, scoreSaved, players, saveGameScore]);
 
   // Fetch leaderboard when entering leaderboard phase
@@ -1104,6 +1112,16 @@ export default function App() {
                   className="inline-flex items-center gap-2 px-4 py-2 bg-success-light border border-success/20 rounded-lg text-success text-sm font-semibold mb-6"
                 >
                   ✓ Resultado salvo no seu perfil
+                </motion.div>
+              )}
+
+              {saveError && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-danger-light border border-danger/20 rounded-lg text-danger text-sm font-semibold mb-6"
+                >
+                  ✗ Não foi possível salvar o resultado. Verifique sua conexão.
                 </motion.div>
               )}
 
