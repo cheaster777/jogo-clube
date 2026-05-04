@@ -57,8 +57,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .select('*')
             .eq('id', session.user.id)
             .single();
-          if (mounted && profileData) {
-            setProfile(profileData as Profile);
+
+          if (mounted) {
+            if (profileData) {
+              setProfile(profileData as Profile);
+            } else {
+              // Profile missing (trigger may have failed) — create it now
+              const { data: created } = await supabase
+                .from('profiles')
+                .upsert({
+                  id: session.user.id,
+                  full_name: session.user.user_metadata?.full_name ?? session.user.email ?? '',
+                  email: session.user.email ?? '',
+                })
+                .select()
+                .single();
+              if (mounted && created) setProfile(created as Profile);
+            }
           }
         }
       } catch {
@@ -82,8 +97,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select('*')
               .eq('id', session.user.id)
               .single();
-            if (mounted && profileData) {
-              setProfile(profileData as Profile);
+
+            if (mounted) {
+              if (profileData) {
+                setProfile(profileData as Profile);
+              } else {
+                // Profile missing — create it so scores can be saved (FK)
+                const { data: created } = await supabase
+                  .from('profiles')
+                  .upsert({
+                    id: session.user.id,
+                    full_name: session.user.user_metadata?.full_name ?? session.user.email ?? '',
+                    email: session.user.email ?? '',
+                  })
+                  .select()
+                  .single();
+                if (mounted && created) setProfile(created as Profile);
+              }
             }
           } else {
             setProfile(null);
