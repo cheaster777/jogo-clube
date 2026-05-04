@@ -103,13 +103,24 @@ export default function App() {
 
   // Save score when game ends
   useEffect(() => {
-    if (phase !== 'gameOver' || !user || scoreSaved) return;
+    console.log('[DEBUG] Save effect - phase:', phase, 'user:', !!user, 'scoreSaved:', scoreSaved, 'players.length:', players.length);
+    
+    if (phase !== 'gameOver' || !user || scoreSaved) {
+      console.log('[DEBUG] Save skipped - conditions not met');
+      return;
+    }
 
     const humanPlayer = players.find(p => !p.isBot);
-    if (!humanPlayer) return;
+    if (!humanPlayer) {
+      console.log('[DEBUG] No human player found!');
+      return;
+    }
+
+    console.log('[DEBUG] Saving score for player:', humanPlayer.name, 'score:', humanPlayer.score);
 
     const doSave = async () => {
       const quality = getWaterQuality(humanPlayer.score);
+      console.log('[DEBUG] Quality:', quality.category, quality.diagnosis);
       await saveGameScore(
         humanPlayer.score,
         quality.category,
@@ -117,6 +128,7 @@ export default function App() {
         humanPlayer.hand.length
       );
       setScoreSaved(true);
+      console.log('[DEBUG] Score saved successfully!');
     };
 
     doSave().catch(err => {
@@ -133,28 +145,38 @@ export default function App() {
 
     const fetchLeaderboard = async () => {
       try {
-        const queryPromise = supabase
+        // Try with join first
+        const { data: dataWithProfile, error: errorWithProfile } = await supabase
           .from('game_scores')
           .select('*, profiles(full_name)')
           .order('score', { ascending: false })
           .limit(20);
 
-        // Hard timeout of 8s — prevents infinite spinner on slow/hung requests
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Ranking timeout')), 8000)
-        );
-
-        const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
         if (cancelled) return;
-        if (error) console.error('Leaderboard error:', error);
-        setLeaderboardData((data as GameScore[]) || []);
+        
+        if (errorWithProfile) {
+          console.warn('Leaderboard join error, trying without profiles:', errorWithProfile);
+          // Fallback: try without join if the join fails
+          const { data: dataOnly, error: errorOnly } = await supabase
+            .from('game_scores')
+            .select('*')
+            .order('score', { ascending: false })
+            .limit(20);
+          
+          if (errorOnly) {
+            console.error('Leaderboard error (fallback):', errorOnly);
+          }
+          
+          setLeaderboardData((dataOnly as GameScore[]) || []);
+        } else {
+          setLeaderboardData((dataWithProfile as GameScore[]) || []);
+        }
       } catch (err) {
         if (!cancelled) {
           console.error('Leaderboard error:', err);
           setLeaderboardData([]);
         }
       } finally {
-        // Always reset loading — even if cancelled, so the spinner never gets stuck
         setLeaderboardLoading(false);
       }
     };
@@ -1123,6 +1145,28 @@ export default function App() {
                 >
                   ✗ Não foi possível salvar o resultado. Verifique sua conexão.
                 </motion.div>
+              )}
+
+              {!scoreSaved && !saveError && user && (
+                <div className="mb-6">
+                  <button
+                    onClick={async () => {
+                      const humanPlayer = players.find(p => !p.isBot);
+                      if (!humanPlayer) return;
+                      const quality = getWaterQuality(humanPlayer.score);
+                      try {
+                        await saveGameScore(humanPlayer.score, quality.category, quality.diagnosis, humanPlayer.hand.length);
+                        setScoreSaved(true);
+                      } catch (err) {
+                        console.error('Manual save failed:', err);
+                        setSaveError(true);
+                      }
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    💾 Salvar Resultado
+                  </button>
+                </div>
               )}
 
               <div className="flex flex-wrap gap-3 justify-center">

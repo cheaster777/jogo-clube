@@ -14,3 +14,8 @@ coverage/
 test-*.mjs
 test-*.txt
 screenshot.png
+debug-*.png
+game-over.png
+ranking.png
+step*.png
+test-*.png
