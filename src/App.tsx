@@ -103,24 +103,13 @@ export default function App() {
 
   // Save score when game ends
   useEffect(() => {
-    console.log('[DEBUG] Save effect - phase:', phase, 'user:', !!user, 'scoreSaved:', scoreSaved, 'players.length:', players.length);
-    
-    if (phase !== 'gameOver' || !user || scoreSaved) {
-      console.log('[DEBUG] Save skipped - conditions not met');
-      return;
-    }
+    if (phase !== 'gameOver' || !user || scoreSaved) return;
 
     const humanPlayer = players.find(p => !p.isBot);
-    if (!humanPlayer) {
-      console.log('[DEBUG] No human player found!');
-      return;
-    }
-
-    console.log('[DEBUG] Saving score for player:', humanPlayer.name, 'score:', humanPlayer.score);
+    if (!humanPlayer) return;
 
     const doSave = async () => {
       const quality = getWaterQuality(humanPlayer.score);
-      console.log('[DEBUG] Quality:', quality.category, quality.diagnosis);
       await saveGameScore(
         humanPlayer.score,
         quality.category,
@@ -128,7 +117,6 @@ export default function App() {
         humanPlayer.hand.length
       );
       setScoreSaved(true);
-      console.log('[DEBUG] Score saved successfully!');
     };
 
     doSave().catch(err => {
@@ -1147,27 +1135,7 @@ export default function App() {
                 </motion.div>
               )}
 
-              {!scoreSaved && !saveError && user && (
-                <div className="mb-6">
-                  <button
-                    onClick={async () => {
-                      const humanPlayer = players.find(p => !p.isBot);
-                      if (!humanPlayer) return;
-                      const quality = getWaterQuality(humanPlayer.score);
-                      try {
-                        await saveGameScore(humanPlayer.score, quality.category, quality.diagnosis, humanPlayer.hand.length);
-                        setScoreSaved(true);
-                      } catch (err) {
-                        console.error('Manual save failed:', err);
-                        setSaveError(true);
-                      }
-                    }}
-                    className="btn btn-secondary"
-                  >
-                    💾 Salvar Resultado
-                  </button>
-                </div>
-              )}
+              
 
               <div className="flex flex-wrap gap-3 justify-center">
                 <button
