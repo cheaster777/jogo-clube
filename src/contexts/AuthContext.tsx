@@ -122,14 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  // Sign out
-  const signOut = async () => {
-    setLoading(true);
-    await supabase.auth.signOut();
+  // Sign out — clear state immediately for instant UI response
+  const signOut = () => {
     setUser(null);
     setProfile(null);
     setSession(null);
-    setLoading(false);
+    // Fire-and-forget: don't block UI on the network call
+    supabase.auth.signOut().catch(console.error);
   };
 
   // Reset password

@@ -125,18 +125,29 @@ export default function App() {
 
     const fetchLeaderboard = async () => {
       try {
-        const { data, error } = await supabase
+        const queryPromise = supabase
           .from('game_scores')
           .select('*, profiles(full_name)')
           .order('score', { ascending: false })
           .limit(20);
+
+        // Hard timeout of 8s — prevents infinite spinner on slow/hung requests
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Ranking timeout')), 8000)
+        );
+
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
         if (cancelled) return;
-        if (error) console.error('Leaderboard fetch error:', error);
+        if (error) console.error('Leaderboard error:', error);
         setLeaderboardData((data as GameScore[]) || []);
       } catch (err) {
-        if (!cancelled) console.error('Leaderboard error:', err);
+        if (!cancelled) {
+          console.error('Leaderboard error:', err);
+          setLeaderboardData([]);
+        }
       } finally {
-        if (!cancelled) setLeaderboardLoading(false);
+        // Always reset loading — even if cancelled, so the spinner never gets stuck
+        setLeaderboardLoading(false);
       }
     };
 
