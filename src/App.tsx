@@ -129,9 +129,19 @@ export default function App() {
   useEffect(() => {
     if (phase !== 'leaderboard') return;
     let cancelled = false;
-    setLeaderboardLoading(true);
 
     const fetchLeaderboard = async () => {
+      setLeaderboardLoading(true);
+      
+      // Timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        if (!cancelled) {
+          console.warn('Leaderboard fetch timeout, showing empty state');
+          setLeaderboardData([]);
+          setLeaderboardLoading(false);
+        }
+      }, 10000);
+
       try {
         // Try with join first
         const { data: dataWithProfile, error: errorWithProfile } = await supabase
@@ -140,6 +150,7 @@ export default function App() {
           .order('score', { ascending: false })
           .limit(20);
 
+        clearTimeout(timeoutId);
         if (cancelled) return;
         
         if (errorWithProfile) {
@@ -165,7 +176,9 @@ export default function App() {
           setLeaderboardData([]);
         }
       } finally {
-        setLeaderboardLoading(false);
+        if (!cancelled) {
+          setLeaderboardLoading(false);
+        }
       }
     };
 
@@ -1138,6 +1151,13 @@ export default function App() {
               
 
               <div className="flex flex-wrap gap-3 justify-center">
+                <button
+                  onClick={() => setPhase('leaderboard')}
+                  className="btn btn-secondary btn-lg"
+                  id="btn-view-ranking"
+                >
+                  <Trophy size={18} /> Ver Ranking
+                </button>
                 <button
                   onClick={() => { setScoreSaved(false); setPhase('setup'); }}
                   className="btn btn-primary btn-lg"
