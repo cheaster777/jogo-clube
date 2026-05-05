@@ -738,7 +738,7 @@ export default function App() {
                 <div className="space-y-4">
                   <h5 className="label">Contato</h5>
                   <ul className="space-y-2 text-sm text-ink-secondary">
-                    <li><a href="mailto:clubedeciencias@gmail.com" className="hover:text-ink transition-colors">lucasczarnesky267@gmail.com</a></li>
+                    <li><a href="mailto:clubedeciencias@gmail.com" className="hover:text-ink transition-colors">clubedecienciasbona@gmail.com</a></li>
                     <li className="pt-2">
                       <a 
                         href="https://instagram.com/clubebona" 
