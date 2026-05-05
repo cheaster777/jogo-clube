@@ -88,6 +88,7 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<GameScore[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
   // Auto-fill player 1 name from Supabase profile
@@ -178,6 +179,7 @@ export default function App() {
       } finally {
         if (!cancelled) {
           setLeaderboardLoading(false);
+          setLeaderboardLoaded(true);
         }
       }
     };
@@ -1202,7 +1204,7 @@ export default function App() {
                 </button>
               </div>
 
-              {leaderboardLoading ? (
+              {!leaderboardLoaded ? (
                 <div className="card p-8 text-center">
                   <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                   <p className="text-ink-muted font-mono text-sm">Carregando ranking...</p>
