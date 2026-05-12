@@ -129,19 +129,26 @@ export default function App() {
   // Fetch leaderboard when entering leaderboard phase
   useEffect(() => {
     if (phase !== 'leaderboard') return;
+    
+    // Prevent multiple fetches
+    if (leaderboardLoading) return;
+    
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const fetchLeaderboard = async () => {
       setLeaderboardLoading(true);
+      setLeaderboardLoaded(false);
       
       // Timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         if (!cancelled) {
           console.warn('Leaderboard fetch timeout, showing empty state');
           setLeaderboardData([]);
           setLeaderboardLoading(false);
+          setLeaderboardLoaded(true);
         }
-      }, 10000);
+      }, 8000);
 
       try {
         // Try with join first
@@ -151,11 +158,11 @@ export default function App() {
           .order('score', { ascending: false })
           .limit(20);
 
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         if (cancelled) return;
         
         if (errorWithProfile) {
-          console.warn('Leaderboard join error, trying without profiles:', errorWithProfile);
+          console.warn('Leaderboard join error, trying without profiles:', errorWithProfile.message);
           // Fallback: try without join if the join fails
           const { data: dataOnly, error: errorOnly } = await supabase
             .from('game_scores')
@@ -164,10 +171,11 @@ export default function App() {
             .limit(20);
           
           if (errorOnly) {
-            console.error('Leaderboard error (fallback):', errorOnly);
+            console.error('Leaderboard error (fallback):', errorOnly.message);
+            setLeaderboardData([]);
+          } else {
+            setLeaderboardData((dataOnly as GameScore[]) || []);
           }
-          
-          setLeaderboardData((dataOnly as GameScore[]) || []);
         } else {
           setLeaderboardData((dataWithProfile as GameScore[]) || []);
         }
@@ -185,8 +193,11 @@ export default function App() {
     };
 
     fetchLeaderboard();
-    return () => { cancelled = true; };
-  }, [phase]);
+    return () => { 
+      cancelled = true; 
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [phase, leaderboardLoading]);
   useEffect(() => {
     setPlayerNames(prev => {
       const newNames = [...prev];
