@@ -126,78 +126,77 @@ export default function App() {
     });
   }, [phase, user, scoreSaved, players, saveGameScore]);
 
-  // Fetch leaderboard when entering leaderboard phase
-  useEffect(() => {
-    if (phase !== 'leaderboard') return;
-    
-    // Prevent multiple fetches
-    if (leaderboardLoading) return;
-    
+  // Fetch leaderboard — called on demand (entering phase or manual refresh)
+  const fetchLeaderboard = useCallback(async () => {
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    const fetchLeaderboard = async () => {
-      setLeaderboardLoading(true);
-      setLeaderboardLoaded(false);
-      
-      // Timeout to prevent infinite loading
-      timeoutId = setTimeout(() => {
-        if (!cancelled) {
-          console.warn('Leaderboard fetch timeout, showing empty state');
-          setLeaderboardData([]);
-          setLeaderboardLoading(false);
-          setLeaderboardLoaded(true);
-        }
-      }, 8000);
+    setLeaderboardLoading(true);
+    setLeaderboardLoaded(false);
+    setLeaderboardData([]);
 
-      try {
-        // Try with join first
-        const { data: dataWithProfile, error: errorWithProfile } = await supabase
+    // Safety timeout: never spin forever
+    timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('Leaderboard fetch timeout');
+        setLeaderboardData([]);
+        setLeaderboardLoading(false);
+        setLeaderboardLoaded(true);
+      }
+    }, 8000);
+
+    try {
+      // Try with profile join first
+      const { data: dataWithProfile, error: errorWithProfile } = await supabase
+        .from('game_scores')
+        .select('*, profiles(full_name)')
+        .order('score', { ascending: false })
+        .limit(20);
+
+      if (timeoutId) clearTimeout(timeoutId);
+      if (cancelled) return;
+
+      if (errorWithProfile) {
+        console.warn('Leaderboard join error, falling back:', errorWithProfile.message);
+        const { data: dataOnly, error: errorOnly } = await supabase
           .from('game_scores')
-          .select('*, profiles(full_name)')
+          .select('*')
           .order('score', { ascending: false })
           .limit(20);
 
-        if (timeoutId) clearTimeout(timeoutId);
-        if (cancelled) return;
-        
-        if (errorWithProfile) {
-          console.warn('Leaderboard join error, trying without profiles:', errorWithProfile.message);
-          // Fallback: try without join if the join fails
-          const { data: dataOnly, error: errorOnly } = await supabase
-            .from('game_scores')
-            .select('*')
-            .order('score', { ascending: false })
-            .limit(20);
-          
+        if (!cancelled) {
           if (errorOnly) {
-            console.error('Leaderboard error (fallback):', errorOnly.message);
+            console.error('Leaderboard fallback error:', errorOnly.message);
             setLeaderboardData([]);
           } else {
             setLeaderboardData((dataOnly as GameScore[]) || []);
           }
-        } else {
+        }
+      } else {
+        if (!cancelled) {
           setLeaderboardData((dataWithProfile as GameScore[]) || []);
         }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Leaderboard error:', err);
-          setLeaderboardData([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLeaderboardLoading(false);
-          setLeaderboardLoaded(true);
-        }
       }
-    };
+    } catch (err) {
+      if (!cancelled) {
+        console.error('Leaderboard error:', err);
+        setLeaderboardData([]);
+      }
+    } finally {
+      if (!cancelled) {
+        setLeaderboardLoading(false);
+        setLeaderboardLoaded(true);
+      }
+    }
 
+    return () => { cancelled = true; if (timeoutId) clearTimeout(timeoutId); };
+  }, []);
+
+  // Fetch leaderboard whenever entering leaderboard phase
+  useEffect(() => {
+    if (phase !== 'leaderboard') return;
     fetchLeaderboard();
-    return () => { 
-      cancelled = true; 
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [phase, leaderboardLoading]);
+  }, [phase]);
   useEffect(() => {
     setPlayerNames(prev => {
       const newNames = [...prev];
@@ -1207,12 +1206,22 @@ export default function App() {
                     <p className="text-[10px] text-ink-muted font-mono uppercase tracking-[0.2em]">Top Expedicionistas</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setPhase('home')}
-                  className="p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
-                >
-                  <ArrowLeft size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={fetchLeaderboard}
+                    disabled={leaderboardLoading}
+                    className="p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink disabled:opacity-40"
+                    title="Atualizar ranking"
+                  >
+                    <RotateCcw size={18} className={leaderboardLoading ? 'animate-spin' : ''} />
+                  </button>
+                  <button
+                    onClick={() => setPhase('home')}
+                    className="p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                </div>
               </div>
 
               {!leaderboardLoaded ? (
@@ -1221,64 +1230,131 @@ export default function App() {
                   <p className="text-ink-muted font-mono text-sm">Carregando ranking...</p>
                 </div>
               ) : leaderboardData.length === 0 ? (
-                <div className="card p-8 text-center">
-                  <p className="text-ink-muted">Nenhuma expedição registrada ainda. Seja o primeiro!</p>
+                <div className="card p-8 text-center space-y-4">
+                  <Trophy size={40} className="text-ink-muted mx-auto opacity-30" />
+                  <p className="text-ink-muted font-serif italic">Nenhuma expedição registrada ainda. Seja o primeiro!</p>
                   <button
                     onClick={() => setPhase('setup')}
-                    className="btn btn-primary mt-4"
+                    className="btn btn-primary"
+                    id="btn-start-from-empty-leaderboard"
                   >
-                    Começar Expedição
+                    <Play size={16} fill="currentColor" /> Começar Expedição
                   </button>
                 </div>
-              ) : (
-                <div className="card overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead className="bg-surface-alt border-b border-border">
-                        <tr>
-                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">#</th>
-                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Jogador</th>
-                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Pontos</th>
-                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Qualidade</th>
-                          <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Data</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {leaderboardData.map((entry, idx) => {
-                          const quality = getWaterQuality(entry.score);
-                          return (
-                            <tr
-                              key={entry.id}
-                              className={`hover:bg-surface-alt transition-colors ${idx === 0 ? 'bg-warning-light/30' : ''}`}
-                            >
-                              <td className="px-4 py-3">
-                                <span className={`font-mono font-bold ${idx < 3 ? 'text-warning' : 'text-ink-muted'}`}>
-                                  #{idx + 1}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 font-serif italic font-semibold">
-                                {(entry as GameScore & { profiles: { full_name: string } }).profiles?.full_name || 'Anônimo'}
-                              </td>
-                              <td className="px-4 py-3 font-mono font-bold">{entry.score}</td>
-                              <td className="px-4 py-3">
-                                <span
-                                  className="px-2 py-0.5 rounded-md text-white font-bold text-xs"
-                                  style={{ backgroundColor: quality.color }}
-                                >
-                                  {quality.category}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 font-mono text-xs text-ink-muted">
-                                {new Date(entry.played_at).toLocaleDateString('pt-BR')}
-                              </td>
+              ) : (() => {
+                // Find the user's best position in the ranking
+                const userEntries = leaderboardData
+                  .map((e, i) => ({ entry: e, idx: i }))
+                  .filter(({ entry }) => entry.user_id === user?.id);
+                const userBestPosition = userEntries.length > 0 ? userEntries[0].idx + 1 : null;
+
+                return (
+                  <>
+                    {/* User position banner */}
+                    {userBestPosition !== null ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-4 px-4 py-3 bg-accent-light border border-accent/20 rounded-xl flex items-center gap-3"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                          <Medal size={16} className="text-white" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-accent">Você está em #{userBestPosition}° no ranking!</div>
+                          <div className="text-xs text-ink-secondary font-mono">Melhor pontuação: {userEntries[0].entry.score} pts</div>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-4 px-4 py-3 bg-surface-alt border border-border rounded-xl flex items-center gap-3"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center shrink-0 border border-border">
+                          <Trophy size={16} className="text-ink-muted" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-ink">Você ainda não jogou</div>
+                          <div className="text-xs text-ink-muted font-mono">Complete uma expedição para entrar no ranking!</div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    <div className="card overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead className="bg-surface-alt border-b border-border">
+                            <tr>
+                              <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">#</th>
+                              <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Jogador</th>
+                              <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Pontos</th>
+                              <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Qualidade</th>
+                              <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Data</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {leaderboardData.map((entry, idx) => {
+                              const quality = getWaterQuality(entry.score);
+                              const isCurrentUser = entry.user_id === user?.id;
+                              const entryWithProfile = entry as GameScore & { profiles?: { full_name: string } | null };
+                              const playerName = entryWithProfile.profiles?.full_name
+                                || (isCurrentUser ? profile?.full_name : null)
+                                || entry.quality_category
+                                || 'Anônimo';
+                              return (
+                                <tr
+                                  key={entry.id}
+                                  className={`transition-colors ${
+                                    isCurrentUser
+                                      ? 'bg-accent-light/40 border-l-2 border-l-accent'
+                                      : idx === 0
+                                      ? 'bg-warning-light/30'
+                                      : 'hover:bg-surface-alt'
+                                  }`}
+                                >
+                                  <td className="px-4 py-3">
+                                    <span className={`font-mono font-bold ${
+                                      idx === 0 ? 'text-warning' :
+                                      idx === 1 ? 'text-ink-secondary' :
+                                      idx === 2 ? 'text-warning/60' :
+                                      'text-ink-muted'
+                                    }`}>
+                                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-serif italic font-semibold">{playerName}</span>
+                                      {isCurrentUser && (
+                                        <span className="px-1.5 py-0.5 bg-accent text-white text-[10px] font-bold uppercase tracking-wider rounded">
+                                          Você
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono font-bold">{entry.score}</td>
+                                  <td className="px-4 py-3">
+                                    <span
+                                      className="px-2 py-0.5 rounded-md text-white font-bold text-xs"
+                                      style={{ backgroundColor: quality.color }}
+                                    >
+                                      {quality.category}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-xs text-ink-muted">
+                                    {new Date(entry.played_at).toLocaleDateString('pt-BR')}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
               <div className="mt-6 text-center">
                 <button
