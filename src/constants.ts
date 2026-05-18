@@ -155,7 +155,7 @@ export interface WaterQuality {
 }
 
 export const WATER_QUALITY_DATA: WaterQuality[] = [
-  { class: 'I', range: '> 150', minScore: 151, maxScore: Infinity, category: 'Bom', diagnosis: 'Água limpa', color: '#059669' },
+  { class: 'I', range: '> 150', minScore: 151, maxScore: Infinity, category: 'Excelente', diagnosis: 'Água limpa', color: '#059669' },
   { class: 'I', range: '101 - 150', minScore: 101, maxScore: 150, category: 'Bom', diagnosis: 'Limpa ou não alterada significativamente', color: '#10b981' },
   { class: 'II', range: '61 - 100', minScore: 61, maxScore: 100, category: 'Aceitável', diagnosis: 'Limpa, porém levemente impactada', color: '#3b82f6' },
   { class: 'III', range: '36 - 60', minScore: 36, maxScore: 60, category: 'Questionável', diagnosis: 'Moderadamente impactada', color: '#f59e0b' },
