@@ -30,7 +30,7 @@ import {
 } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
-import { supabase } from './lib/supabase';
+import { supabase, supabasePublic } from './lib/supabase';
 import { GameScore } from './contexts/AuthContext';
 
 // Helper to get water quality
@@ -126,58 +126,56 @@ export default function App() {
     });
   }, [phase, user, scoreSaved, players, saveGameScore]);
 
-  // Fetch leaderboard — called on demand (entering phase or manual refresh)
+  // Fetch leaderboard — usa supabasePublic (sem auth lock) para evitar conflito
+  // com o cliente principal que gerencia o token de autenticação.
   const fetchLeaderboard = useCallback(async () => {
     let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     setLeaderboardLoading(true);
     setLeaderboardLoaded(false);
     setLeaderboardData([]);
 
-    // Safety timeout: never spin forever
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (!cancelled) {
         console.warn('Leaderboard fetch timeout');
         setLeaderboardData([]);
         setLeaderboardLoading(false);
         setLeaderboardLoaded(true);
       }
-    }, 8000);
+    }, 10000);
 
     try {
-      // Try with profile join first
-      const { data: dataWithProfile, error: errorWithProfile } = await supabase
-        .from('game_scores')
-        .select('*, profiles(full_name)')
+      // Usa supabasePublic (sem persistSession / autoRefreshToken) para não
+      // competir pelo lock do auth-token com o cliente principal.
+      const { data, error } = await supabasePublic
+        .from('ranking_global')
+        .select('id, user_id, score, quality_category, quality_diagnosis, families_count, played_at, full_name')
         .order('score', { ascending: false })
-        .limit(20);
+        .limit(50);
 
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
       if (cancelled) return;
 
-      if (errorWithProfile) {
-        console.warn('Leaderboard join error, falling back:', errorWithProfile.message);
-        const { data: dataOnly, error: errorOnly } = await supabase
+      if (error) {
+        // Fallback: consulta direta à tabela caso a view ainda não exista
+        console.warn('ranking_global indisponível, tentando fallback:', error.message);
+        const { data: fallback, error: fallbackErr } = await supabasePublic
           .from('game_scores')
-          .select('*')
+          .select('id, user_id, score, quality_category, quality_diagnosis, families_count, played_at')
           .order('score', { ascending: false })
-          .limit(20);
+          .limit(50);
 
         if (!cancelled) {
-          if (errorOnly) {
-            console.error('Leaderboard fallback error:', errorOnly.message);
-            setLeaderboardData([]);
-          } else {
-            setLeaderboardData((dataOnly as GameScore[]) || []);
-          }
+          setLeaderboardData(fallbackErr ? [] : ((fallback as GameScore[]) || []));
+          if (fallbackErr) console.error('Fallback também falhou:', fallbackErr.message);
         }
       } else {
         if (!cancelled) {
-          setLeaderboardData((dataWithProfile as GameScore[]) || []);
+          setLeaderboardData((data as GameScore[]) || []);
         }
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       if (!cancelled) {
         console.error('Leaderboard error:', err);
         setLeaderboardData([]);
@@ -189,7 +187,7 @@ export default function App() {
       }
     }
 
-    return () => { cancelled = true; if (timeoutId) clearTimeout(timeoutId); };
+    return () => { cancelled = true; clearTimeout(timeoutId); };
   }, []);
 
   // Fetch leaderboard whenever entering leaderboard phase
@@ -1297,10 +1295,12 @@ export default function App() {
                             {leaderboardData.map((entry, idx) => {
                               const quality = getWaterQuality(entry.score);
                               const isCurrentUser = entry.user_id === user?.id;
-                              const entryWithProfile = entry as GameScore & { profiles?: { full_name: string } | null };
-                              const playerName = entryWithProfile.profiles?.full_name
+                              // ranking_global já traz full_name direto no campo;
+                              // o fallback usa o join antigo (profiles.full_name)
+                              const entryWithProfile = entry as GameScore & { full_name?: string; profiles?: { full_name: string } | null };
+                              const playerName = entryWithProfile.full_name
+                                || entryWithProfile.profiles?.full_name
                                 || (isCurrentUser ? profile?.full_name : null)
-                                || entry.quality_category
                                 || 'Anônimo';
                               return (
                                 <tr
@@ -1573,7 +1573,7 @@ export default function App() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-10 pt-8 border-t border-border text-center">
-          <p className="text-xs uppercase tracking-widest text-ink-muted font-mono">Desenvolvido para o projeto de clube bona</p>
+          <p className="text-xs uppercase tracking-widest text-ink-muted font-mono">Desenvolvido por Victor Gabriel para o projeto de clube bona</p>
         </div>
       </footer>
     </div>
