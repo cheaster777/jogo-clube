@@ -62,17 +62,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (profileData) {
               setProfile(profileData as Profile);
             } else {
-              // Profile missing (trigger may have failed) — create it now
-              const { data: created } = await supabase
-                .from('profiles')
-                .upsert({
-                  id: session.user.id,
-                  full_name: session.user.user_metadata?.full_name ?? session.user.email ?? '',
-                  email: session.user.email ?? '',
-                })
-                .select()
-                .single();
-              if (mounted && created) setProfile(created as Profile);
+              // Profile missing due to race condition with the database trigger.
+              let retries = 3;
+              let foundProfile = null;
+              
+              while (retries > 0 && !foundProfile && mounted) {
+                await new Promise(resolve => setTimeout(resolve, 800)); // wait 800ms
+                const { data: retryData } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', session.user.id)
+                  .single();
+                  
+                if (retryData) {
+                  foundProfile = retryData;
+                }
+                retries--;
+              }
+              
+              if (mounted && foundProfile) {
+                setProfile(foundProfile as Profile);
+              } else if (mounted) {
+                console.error("Não foi possível carregar o perfil no init após várias tentativas.");
+              }
             }
           }
         }
@@ -102,17 +114,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (profileData) {
                 setProfile(profileData as Profile);
               } else {
-                // Profile missing — create it so scores can be saved (FK)
-                const { data: created } = await supabase
-                  .from('profiles')
-                  .upsert({
-                    id: session.user.id,
-                    full_name: session.user.user_metadata?.full_name ?? session.user.email ?? '',
-                    email: session.user.email ?? '',
-                  })
-                  .select()
-                  .single();
-                if (mounted && created) setProfile(created as Profile);
+                // Profile missing due to race condition with the database trigger.
+                // Since we don't have INSERT permissions to upsert it directly from the client,
+                // we'll retry fetching it a few times until the trigger finishes.
+                let retries = 3;
+                let foundProfile = null;
+                
+                while (retries > 0 && !foundProfile && mounted) {
+                  await new Promise(resolve => setTimeout(resolve, 800)); // wait 800ms
+                  const { data: retryData } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+                    
+                  if (retryData) {
+                    foundProfile = retryData;
+                  }
+                  retries--;
+                }
+                
+                if (mounted && foundProfile) {
+                  setProfile(foundProfile as Profile);
+                } else if (mounted) {
+                  console.error("Não foi possível carregar o perfil após várias tentativas.");
+                }
               }
             }
           } else {

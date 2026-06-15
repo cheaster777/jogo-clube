@@ -1393,7 +1393,7 @@ export default function App() {
               <div className="flex justify-between items-start mb-8 border-b border-border pb-4">
                 <div>
                   <h2 className="text-2xl md:text-3xl font-bold italic font-serif tracking-tight">Regras do Jogo</h2>
-                  <p className="text-xs font-mono uppercase tracking-widest text-ink-muted mt-1">Clube de Ciências — Bioindicadores</p>
+                  <p className="text-xs font-mono uppercase tracking-widest text-ink-muted mt-1">Clube de Ciências de bona — Bioindicadores</p>
                 </div>
                 <button 
                   onClick={() => setShowRules(false)} 

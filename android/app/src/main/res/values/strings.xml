@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Clube de Ciências</string>
+    <string name="title_activity_main">Clube de Ciências</string>
+    <string name="package_name">com.clubedeciencias.jogo</string>
+    <string name="custom_url_scheme">com.clubedeciencias.jogo</string>
+</resources>
