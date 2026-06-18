@@ -33,6 +33,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function loadProfile(userId: string): Promise<Profile | null> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (data) return data as Profile;
+    if (attempt < 3) await new Promise(r => setTimeout(r, 800));
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -41,55 +54,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen for auth state changes
   useEffect(() => {
-    const timeout = setTimeout(() => setLoading(false), 5000);
+    const timeout = setTimeout(() => setLoading(false), 8000);
     let mounted = true;
 
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+
         if (!mounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
 
         if (session?.user) {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          // Validate session by fetching the user from Supabase API
+          const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
 
-          if (mounted) {
-            if (profileData) {
-              setProfile(profileData as Profile);
-            } else {
-              // Profile missing due to race condition with the database trigger.
-              let retries = 3;
-              let foundProfile = null;
-              
-              while (retries > 0 && !foundProfile && mounted) {
-                await new Promise(resolve => setTimeout(resolve, 800)); // wait 800ms
-                const { data: retryData } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', session.user.id)
-                  .single();
-                  
-                if (retryData) {
-                  foundProfile = retryData;
-                }
-                retries--;
-              }
-              
-              if (mounted && foundProfile) {
-                setProfile(foundProfile as Profile);
-              } else if (mounted) {
-                console.error("Não foi possível carregar o perfil no init após várias tentativas.");
+          if (!mounted) return;
+
+          if (userError || !currentUser) {
+            // Session token is stale/invalid — clear it
+            await supabase.auth.signOut();
+            if (mounted) {
+              setSession(null);
+              setUser(null);
+              setProfile(null);
+            }
+          } else {
+            setSession(session);
+            setUser(currentUser);
+
+            const profileData = await loadProfile(currentUser.id);
+            if (mounted) {
+              if (profileData) {
+                setProfile(profileData);
+              } else {
+                console.error("Não foi possível carregar o perfil no init.");
+                // Profile missing — sign out to avoid broken state
+                await supabase.auth.signOut();
+                setSession(null);
+                setUser(null);
+                setProfile(null);
               }
             }
           }
         }
       } catch {
-        if (mounted) setUser(null);
+        if (mounted) {
+          setUser(null);
+          setProfile(null);
+          setSession(null);
+        }
       }
       if (mounted) setLoading(false);
       clearTimeout(timeout);
@@ -102,50 +114,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         setSession(session);
         setUser(session?.user ?? null);
-        try {
-          if (session?.user) {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
 
-            if (mounted) {
-              if (profileData) {
-                setProfile(profileData as Profile);
-              } else {
-                // Profile missing due to race condition with the database trigger.
-                // Since we don't have INSERT permissions to upsert it directly from the client,
-                // we'll retry fetching it a few times until the trigger finishes.
-                let retries = 3;
-                let foundProfile = null;
-                
-                while (retries > 0 && !foundProfile && mounted) {
-                  await new Promise(resolve => setTimeout(resolve, 800)); // wait 800ms
-                  const { data: retryData } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-                    
-                  if (retryData) {
-                    foundProfile = retryData;
-                  }
-                  retries--;
-                }
-                
-                if (mounted && foundProfile) {
-                  setProfile(foundProfile as Profile);
-                } else if (mounted) {
-                  console.error("Não foi possível carregar o perfil após várias tentativas.");
-                }
-              }
-            }
+        if (!session?.user) {
+          setProfile(null);
+          return;
+        }
+
+        const profileData = await loadProfile(session.user.id);
+        if (mounted) {
+          if (profileData) {
+            setProfile(profileData);
           } else {
+            console.error("Não foi possível carregar o perfil após login.");
             setProfile(null);
           }
-        } catch {
-          if (mounted) setUser(null);
         }
       }
     );
@@ -178,13 +160,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  // Sign out — clear state immediately for instant UI response
-  const signOut = () => {
+  // Sign out — clear session and state
+  const signOut = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setSession(null);
-    // Fire-and-forget: don't block UI on the network call
-    supabase.auth.signOut().catch(console.error);
   };
 
   // Reset password
