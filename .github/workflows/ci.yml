@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://postgres:ci-password@localhost:5432/jogo_clube_test
+      TEST_DATABASE_URL: postgresql://postgres:ci-password@localhost:5432/jogo_clube_test
+
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: jogo_clube_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d jogo_clube_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências reproduzíveis
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Typecheck do backend
+        run: npm run server:build
+
+      - name: Build do frontend
+        run: npm run build
+
+      - name: Instalar navegador E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke E2E do frontend
+        run: npm run test:e2e
+
+      - name: Aplicar migrações no PostgreSQL de CI
+        run: npm run db:migrate
+
+      - name: Testes da aplicação
+        shell: bash
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
+            npm test
+          else
+            echo "Nenhum script de testes configurado; os testes entram na Fase 1 do PRD."
+          fi
+
+      - name: Smoke de backup criptografado e restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y age postgresql-client
+          key_file="$RUNNER_TEMP/jogo-clube-age-key"
+          dump_file="$RUNNER_TEMP/jogo-clube-ci.dump.age"
+          age-keygen -o "$key_file" >/dev/null
+          recipient="$(grep -o 'age1[[:alnum:]]*' "$key_file" | head -n 1)"
+          test -n "$recipient"
+          pg_dump --format=custom --no-owner "$DATABASE_URL" \
+            | age -r "$recipient" -o "$dump_file"
+          sha256sum "$dump_file" > "$dump_file.sha256"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE jogo_clube_restore'
+          restore_url='postgresql://postgres:ci-password@localhost:5432/jogo_clube_restore'
+          BACKUP_FILE="$dump_file" \
+          AGE_KEY_FILE="$key_file" \
+          RESTORE_DATABASE_URL="$restore_url" \
+            bash scripts/restore-postgres.sh
+          restored_tables="$(psql "$restore_url" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")"
+          test "$restored_tables" -ge 9
+
+      - name: Verificar migrações
+        run: |
+          node scripts/verify-migrations.mjs
+          node --check scripts/import-supabase-users.mjs
+
+      - name: Auditar dependências de runtime
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Auditar ferramentas de build e mobile
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      - name: Validar configuração do Compose
+        env:
+          POSTGRES_PASSWORD: ci-password
+        run: docker compose config --quiet
+
+      - name: Build da imagem estática
+        run: docker build --target frontend --tag jogo-clube-frontend:ci .
+
+      - name: Build da imagem da API
+        run: docker build --target api --tag jogo-clube-api:ci .

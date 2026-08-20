@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Trophy, 
@@ -30,8 +30,11 @@ import {
 } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
-import { supabase, supabasePublic } from './lib/supabase';
-import { GameScore } from './contexts/AuthContext';
+import SetupPanel from './components/SetupPanel';
+import { ApiError, apiClient, isApiConfigured } from './lib/api';
+import type { LeaderboardEntry } from './lib/api';
+import { createLocalGame, dispatchLocalCommand, getLocalUiState, LocalGameState } from './game/localAdapter';
+import { useServerMatch } from './hooks/useServerMatch';
 
 // Helper to get water quality
 const getWaterQuality = (score: number) => {
@@ -48,16 +51,6 @@ const shouldUseDarkText = (hexColor: string): boolean => {
   return luminance > 0.6;
 };
 
-// Helper to shuffle array
-const shuffle = <T,>(array: T[]): T[] => {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-};
-
 type GamePhase = 'home' | 'setup' | 'playing' | 'action' | 'gameOver' | 'leaderboard';
 
 interface Player {
@@ -68,8 +61,10 @@ interface Player {
   isBot: boolean;
 }
 
+type GameMode = 'local' | 'server';
+
 export default function App() {
-  const { user, profile, loading, signOut, saveGameScore } = useAuth();
+  const { user, profile, loading, localMode, signOut } = useAuth();
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
@@ -83,15 +78,23 @@ export default function App() {
   const [botFlags, setBotFlags] = useState<boolean[]>([false, true]);
   const [currentRound, setCurrentRound] = useState(1);
   const MAX_ROUNDS = 5;
-  const [scoreSaved, setScoreSaved] = useState(false);
+  const [localGame, setLocalGame] = useState<LocalGameState | null>(null);
+  const [gameMode, setGameMode] = useState<GameMode>('local');
+  const serverMatch = useServerMatch({
+    enabled: gameMode === 'server',
+    phase,
+    playerCount: numPlayers,
+    playerNames,
+  });
 
   const [showRules, setShowRules] = useState(false);
-  const [leaderboardData, setLeaderboardData] = useState<GameScore[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const leaderboardRequestId = useRef(0);
 
-  // Auto-fill player 1 name from Supabase profile
+  // Auto-fill player 1 name from the authenticated API profile.
   useEffect(() => {
     if (profile?.full_name) {
       setPlayerNames(prev => {
@@ -102,99 +105,46 @@ export default function App() {
     }
   }, [profile]);
 
-  // Save score when game ends
-  useEffect(() => {
-    if (phase !== 'gameOver' || !user || scoreSaved) return;
+  // A partida atual é local. O resultado não é publicado pelo navegador;
+  // somente uma partida criada e finalizada pela API poderá entrar no ranking.
 
-    const humanPlayer = players.find(p => !p.isBot);
-    if (!humanPlayer) return;
-
-    const doSave = async () => {
-      const quality = getWaterQuality(humanPlayer.score);
-      await saveGameScore(
-        humanPlayer.score,
-        quality.category,
-        quality.diagnosis,
-        humanPlayer.hand.length
-      );
-      setScoreSaved(true);
-    };
-
-    doSave().catch(err => {
-      console.error('Score save failed:', err);
-      setSaveError(true);
-    });
-  }, [phase, user, scoreSaved, players, saveGameScore]);
-
-  // Fetch leaderboard — usa supabasePublic (sem auth lock) para evitar conflito
-  // com o cliente principal que gerencia o token de autenticação.
+  // Fetch leaderboard through the API, with an explicit retryable error state.
   const fetchLeaderboard = useCallback(async () => {
-    let cancelled = false;
+    const requestId = leaderboardRequestId.current + 1;
+    leaderboardRequestId.current = requestId;
 
     setLeaderboardLoading(true);
     setLeaderboardLoaded(false);
+    setLeaderboardError(null);
     setLeaderboardData([]);
 
-    const timeoutId = setTimeout(() => {
-      if (!cancelled) {
-        console.warn('Leaderboard fetch timeout');
-        setLeaderboardData([]);
-        setLeaderboardLoading(false);
-        setLeaderboardLoaded(true);
-      }
-    }, 10000);
-
     try {
-      // Usa supabasePublic (sem persistSession / autoRefreshToken) para não
-      // competir pelo lock do auth-token com o cliente principal.
-      const { data, error } = await supabasePublic
-        .from('ranking_global')
-        .select('id, user_id, score, quality_category, quality_diagnosis, families_count, played_at, full_name')
-        .order('score', { ascending: false })
-        .limit(50);
+      const response = await apiClient.getLeaderboard(50);
+      if (requestId !== leaderboardRequestId.current) return;
 
-      clearTimeout(timeoutId);
-      if (cancelled) return;
-
-      if (error) {
-        // Fallback: consulta direta à tabela caso a view ainda não exista
-        console.warn('ranking_global indisponível, tentando fallback:', error.message);
-        const { data: fallback, error: fallbackErr } = await supabasePublic
-          .from('game_scores')
-          .select('id, user_id, score, quality_category, quality_diagnosis, families_count, played_at')
-          .order('score', { ascending: false })
-          .limit(50);
-
-        if (!cancelled) {
-          setLeaderboardData(fallbackErr ? [] : ((fallback as GameScore[]) || []));
-          if (fallbackErr) console.error('Fallback também falhou:', fallbackErr.message);
-        }
-      } else {
-        if (!cancelled) {
-          setLeaderboardData((data as GameScore[]) || []);
-        }
-      }
+      const entries = Array.isArray(response)
+        ? response
+        : response.data ?? response.entries ?? [];
+      setLeaderboardData(entries as LeaderboardEntry[]);
     } catch (err) {
-      clearTimeout(timeoutId);
-      if (!cancelled) {
-        console.error('Leaderboard error:', err);
-        setLeaderboardData([]);
-      }
+      if (requestId !== leaderboardRequestId.current) return;
+      const message = err instanceof ApiError
+        ? err.message
+        : 'Não foi possível carregar o ranking. Tente novamente.';
+      setLeaderboardData([]);
+      setLeaderboardError(message);
     } finally {
-      if (!cancelled) {
-        setLeaderboardLoading(false);
-        setLeaderboardLoaded(true);
-      }
+      if (requestId !== leaderboardRequestId.current) return;
+      setLeaderboardLoading(false);
+      setLeaderboardLoaded(true);
     }
-
-    return () => { cancelled = true; clearTimeout(timeoutId); };
   }, []);
 
   // Fetch leaderboard whenever entering leaderboard phase
   useEffect(() => {
     if (phase !== 'leaderboard') return;
     fetchLeaderboard();
-  }, [phase]);
+  }, [phase, fetchLeaderboard]);
   useEffect(() => {
     setPlayerNames(prev => {
       const newNames = [...prev];
@@ -221,145 +171,82 @@ export default function App() {
     });
   }, [numPlayers]);
 
+  useEffect(() => {
+    if (gameMode !== 'server' || !serverMatch.state) return;
+    const state = serverMatch.state;
+    setPlayers(state.players);
+    setFamilyDeck(new Array(state.familyDeckCount) as FamilyCard[]);
+    setActionDeck(new Array(state.actionDeckCount) as ActionCard[]);
+    setCurrentPlayerIndex(state.currentPlayerIndex);
+    setCurrentRound(state.currentRound);
+    setPhase(state.phase);
+    setLastAction(state.lastAction);
+    setActionMessage(state.actionMessage);
+  }, [gameMode, serverMatch.state]);
+
 
   // Initialize Game
-  const initGame = () => {
-    // Create Family Deck (multiple copies of each for better gameplay)
-    const families: FamilyCard[] = [];
-    FAMILY_CARDS_DATA.forEach((f, i) => {
-      // Add 2 copies of each family
-      for (let k = 0; k < 2; k++) {
-        families.push({ ...f, id: `f-${i}-${k}` } as FamilyCard);
-      }
-    });
-
-    // Create Action Deck
-    const actions: ActionCard[] = [];
-    ACTION_CARDS_DATA.forEach((a, i) => {
-      // Add 4 copies of each action
-      for (let k = 0; k < 4; k++) {
-        actions.push({ ...a, id: `a-${i}-${k}` } as ActionCard);
-      }
-    });
-
-    const shuffledFamilies = shuffle(families);
-    const shuffledActions = shuffle(actions);
-
-    // Create Players
-    const newPlayers: Player[] = Array.from({ length: numPlayers }, (_, i) => ({
-      id: i,
-      name: botFlags[i] ? `${playerNames[i]} (BOT)` : playerNames[i],
-      hand: [],
-      score: 0,
-      isBot: botFlags[i],
-    }));
-
-    // Deal 7 cards to each
-    newPlayers.forEach(p => {
-      p.hand = shuffledFamilies.splice(0, 7);
-      p.score = p.hand.reduce((sum, c) => sum + c.score, 0);
-    });
-
-    setPlayers(newPlayers);
-    setFamilyDeck(shuffledFamilies);
-    setActionDeck(shuffledActions);
-    setCurrentPlayerIndex(0);
-    setCurrentRound(1);
-    setPhase('playing');
-    setLastAction(null);
-    setActionMessage('');
-  };
-
-  const calculateScores = (updatedPlayers: Player[]) => {
-    return updatedPlayers.map(p => ({
-      ...p,
-      score: p.hand.reduce((sum, c) => sum + c.score, 0)
-    }));
-  };
-
-  const handleActionEffect = (action: ActionCard) => {
-    let updatedPlayers = [...players];
-    let updatedFamilyDeck = [...familyDeck];
-    let message = '';
-
-    const currentPlayer = updatedPlayers[currentPlayerIndex];
-
-    switch (action.title) {
-      case 'Despejo de esgoto':
-        // Lose 2 families with score 10 or 8
-        const highScores = currentPlayer.hand
-          .filter((c: FamilyCard) => c.score === 10 || c.score === 8)
-          .sort((a, b) => b.score - a.score);
-        
-        const toRemove = highScores.slice(0, 2);
-        if (toRemove.length > 0) {
-          currentPlayer.hand = currentPlayer.hand.filter((c: FamilyCard) => !toRemove.find(r => r.id === c.id));
-          message = `Você perdeu: ${toRemove.map(c => c.name).join(', ')}`;
-        } else {
-          message = 'Você não tinha famílias de pontuação 10 ou 8 para perder.';
-        }
-        break;
-
-      case 'Drift — arrasto':
-        // Colleague anterior eliminates 5 cards from your hand
-        const removedDrift = shuffle(currentPlayer.hand).slice(0, 5);
-        currentPlayer.hand = currentPlayer.hand.filter((c: FamilyCard) => !removedDrift.find((r: FamilyCard) => r.id === c.id));
-        message = `O seu colega anterior removeu 5 cartas aleatórias do seu monte.`;
-        break;
-
-      case 'Peixe exótico':
-        // Next colleague eliminates 5 cards
-        const removedExotic = shuffle(currentPlayer.hand).slice(0, 5);
-        currentPlayer.hand = currentPlayer.hand.filter((c: FamilyCard) => !removedExotic.find((r: FamilyCard) => r.id === c.id));
-        message = `O seu próximo colega removeu 5 cartas aleatórias da sua mão.`;
-        break;
-
-      case 'Replantio de mata ciliar':
-        // Take 1 highest score card from each opponent
-        updatedPlayers.forEach((p, idx) => {
-          if (idx !== currentPlayerIndex && p.hand.length > 0) {
-            const sortedHand = [...p.hand].sort((a, b) => b.score - a.score);
-            const bestCard = sortedHand[0];
-            p.hand = p.hand.filter(c => c.id !== bestCard.id);
-            currentPlayer.hand.push(bestCard);
-          }
-        });
-        message = 'A biodiversidade melhorou! Você pegou a melhor carta de cada oponente.';
-        break;
-
-      case 'Regularização de esgotos':
-        // Draw 3
-        const drawn3 = updatedFamilyDeck.splice(0, 3);
-        currentPlayer.hand.push(...drawn3);
-        message = `Redes regularizadas! Você pescou ${drawn3.length} cartas do monte.`;
-        break;
-
-      case 'Educação Ambiental':
-        // Draw 5
-        const drawn5 = updatedFamilyDeck.splice(0, 5);
-        currentPlayer.hand.push(...drawn5);
-        message = `Conscientização realizada! Você pescou ${drawn5.length} cartas do monte.`;
-        break;
-    }
-
-    setPlayers(calculateScores(updatedPlayers));
-    setFamilyDeck(updatedFamilyDeck);
-    setActionMessage(message);
-    setPhase('action');
-  };
-
-  const drawAction = useCallback(() => {
-    if (actionDeck.length === 0) {
-      setPhase('gameOver');
+  const initGame = async () => {
+    if (gameMode === 'server') {
+      await serverMatch.start();
       return;
     }
 
-    const newActionDeck = [...actionDeck];
-    const drawnAction = newActionDeck.shift()!;
-    setActionDeck(newActionDeck);
-    setLastAction(drawnAction);
-    handleActionEffect(drawnAction);
-  }, [actionDeck, players, currentPlayerIndex, familyDeck]);
+    const nextGame = createLocalGame({
+      seed: String(Date.now()),
+      players: Array.from({ length: numPlayers }, (_, i) => ({
+        name: botFlags[i] ? `${playerNames[i]} (BOT)` : playerNames[i],
+        isBot: botFlags[i],
+      })),
+      maxRounds: MAX_ROUNDS,
+    });
+
+    syncLocalGame(nextGame);
+  };
+
+  const syncLocalGame = useCallback((nextGame: LocalGameState) => {
+    const uiState = getLocalUiState(nextGame);
+    setLocalGame(nextGame);
+    setPlayers(uiState.players);
+    setFamilyDeck(uiState.familyDeck);
+    setActionDeck(uiState.actionDeck);
+    setCurrentPlayerIndex(uiState.currentPlayerIndex);
+    setCurrentRound(uiState.currentRound);
+    setPhase(uiState.phase);
+    setLastAction(uiState.lastAction);
+    setActionMessage(uiState.actionMessage);
+  }, []);
+
+  const runLocalCommand = useCallback((command: 'DRAW_ACTION' | 'END_TURN') => {
+    if (!localGame) return;
+
+    try {
+      const nextGame = dispatchLocalCommand(localGame, { type: command });
+      syncLocalGame(nextGame);
+    } catch (error) {
+      console.error('Falha ao executar comando local:', error);
+    }
+  }, [localGame, syncLocalGame]);
+
+  const runServerCommand = useCallback((type: 'DRAW_ACTION' | 'END_TURN') => {
+    void serverMatch.sendCommand(type);
+  }, [serverMatch.sendCommand]);
+
+  const drawAction = useCallback(() => {
+    if (gameMode === 'server') {
+      void runServerCommand('DRAW_ACTION');
+      return;
+    }
+    runLocalCommand('DRAW_ACTION');
+  }, [gameMode, runLocalCommand, runServerCommand]);
+
+  const nextTurn = useCallback(() => {
+    if (gameMode === 'server') {
+      void runServerCommand('END_TURN');
+      return;
+    }
+    runLocalCommand('END_TURN');
+  }, [gameMode, runLocalCommand, runServerCommand]);
 
   // Bot Logic
   useEffect(() => {
@@ -375,29 +262,10 @@ export default function App() {
       }, 2500);
       return () => clearTimeout(timer);
     }
-  }, [phase, currentPlayerIndex, players]);
-
-  const nextTurn = useCallback(() => {
-    if (familyDeck.length === 0 || actionDeck.length === 0) {
-      setPhase('gameOver');
-      return;
-    }
-
-    if (currentPlayerIndex === players.length - 1) {
-      if (currentRound >= MAX_ROUNDS) {
-        setPhase('gameOver');
-        return;
-      }
-      setCurrentRound(prev => prev + 1);
-      setCurrentPlayerIndex(0);
-    } else {
-      setCurrentPlayerIndex((prev) => prev + 1);
-    }
-    
-    setPhase('playing');
-    setLastAction(null);
-    setActionMessage('');
-  }, [familyDeck.length, actionDeck.length, currentPlayerIndex, players.length, currentRound]);
+  }, [phase, currentPlayerIndex, players, drawAction, nextTurn]);
+  const handPlayerIndex = gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) >= 0
+    ? serverMatch.state?.viewerSeat ?? -1
+    : currentPlayerIndex;
   // Auth gate: show login screen if not authenticated
   if (loading) {
     return (
@@ -410,7 +278,7 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (!user && !localMode) {
     return <AuthScreen />;
   }
 
@@ -418,7 +286,7 @@ export default function App() {
     <div className="min-h-screen bg-bg text-ink font-sans selection:bg-accent selection:text-white">
       {/* ==================== HEADER ==================== */}
       <header className="border-b border-border bg-surface/80 backdrop-blur-md p-4 md:p-6 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setPhase('home')}>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => { serverMatch.reset(); setPhase('home'); }}>
           <div className="relative w-24 h-16 flex items-center shrink-0">
             <img 
               src="/assets/images/Cópia de Logo (1).png" 
@@ -468,7 +336,7 @@ export default function App() {
           )}
           {phase !== 'home' && (
             <button 
-              onClick={() => setPhase('setup')}
+              onClick={() => { serverMatch.reset(); setPhase('setup'); }}
               className="p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
               title="Reiniciar"
               id="btn-restart"
@@ -478,9 +346,9 @@ export default function App() {
           )}
           {/* User info + Logout */}
           <div className="flex items-center gap-2 border-l border-border pl-3 ml-1">
-            <div className="hidden md:block text-right">
-              <div className="text-xs font-bold font-serif italic leading-tight truncate max-w-[120px]">{profile?.full_name}</div>
-              <div className="text-xs text-ink-muted font-mono truncate max-w-[120px]">{user.email}</div>
+              <div className="hidden md:block text-right">
+                <div className="text-xs font-bold font-serif italic leading-tight truncate max-w-[120px]">{profile?.full_name}</div>
+              <div className="text-xs text-ink-muted font-mono truncate max-w-[120px]">{user?.email || 'Modo local'}</div>
             </div>
             <button
               onClick={signOut}
@@ -782,106 +650,23 @@ export default function App() {
 
           {/* ==================== SETUP PAGE ==================== */}
           {phase === 'setup' && (
-            <motion.div 
-              key="setup"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-md mx-auto mt-12 md:mt-20"
-            >
-              <div className="card p-6 md:p-8 shadow-lg" id="setup-panel">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-accent-light rounded-lg flex items-center justify-center">
-                    <Users size={20} className="text-accent" />
-                  </div>
-                  <h2 className="text-xl font-bold italic font-serif">Configuração do Jogo</h2>
-                </div>
-                
-                <div className="space-y-6">
-                  <div>
-                    <label className="label block mb-3">Número de Jogadores</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[2, 3, 4].map(n => (
-                        <button
-                          key={n}
-                          onClick={() => setNumPlayers(n)}
-                          className={`py-3 rounded-lg font-mono font-semibold transition-all border ${
-                            numPlayers === n 
-                              ? 'bg-ink text-white border-ink shadow-sm' 
-                              : 'border-border-strong hover:bg-surface-alt text-ink-secondary'
-                          }`}
-                          id={`btn-players-${n}`}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="label block mb-3">Configurar Jogadores</label>
-                    <div className="space-y-3 mb-6">
-                      {playerNames.map((name, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center text-xs font-mono font-bold shrink-0">
-                            {i + 1}
-                          </div>
-                          <div className="flex-grow flex gap-2">
-                            <input
-                              type="text"
-                              value={name}
-                              onChange={(e) => {
-                                const newNames = [...playerNames];
-                                newNames[i] = e.target.value;
-                                setPlayerNames(newNames);
-                              }}
-                              className="input-field flex-grow font-serif italic"
-                              placeholder={`Nome do Jogador ${i + 1}`}
-                              id={`input-player-${i}`}
-                            />
-                            <button
-                              onClick={() => {
-                                const newFlags = [...botFlags];
-                                newFlags[i] = !newFlags[i];
-                                setBotFlags(newFlags);
-                              }}
-                              className={`px-3 rounded-lg text-xs font-mono font-semibold uppercase tracking-tight transition-all border ${
-                                botFlags[i] 
-                                  ? 'bg-accent text-white border-accent' 
-                                  : 'bg-surface text-ink-muted border-border-strong'
-                              }`}
-                              id={`btn-bot-${i}`}
-                            >
-                              {botFlags[i] ? 'BOT' : 'Humano'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-accent-light/50 border border-accent/20 rounded-lg text-sm leading-relaxed">
-                    <div className="flex gap-2 mb-2 font-bold text-accent uppercase tracking-tight text-xs">
-                      <Info size={14} /> Regras Rápidas
-                    </div>
-                    <ul className="list-disc list-inside space-y-1 text-ink-secondary text-sm">
-                      <li>Cada jogador começa com 7 cartas de família.</li>
-                      <li>A partida dura exatamente <strong>5 rodadas</strong>.</li>
-                      <li>Na sua vez, você DEVE puxar uma carta de ação.</li>
-                      <li>O vencedor é quem tiver mais pontos após as 5 rodadas.</li>
-                    </ul>
-                  </div>
-
-                  <button
-                    onClick={initGame}
-                    className="btn btn-primary btn-lg w-full gap-2"
-                    id="btn-init-game"
-                  >
-                    <Play size={18} fill="currentColor" /> Iniciar Expedição
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+            <SetupPanel
+              gameMode={gameMode}
+              apiConfigured={isApiConfigured}
+              onGameModeChange={setGameMode}
+              playerCount={numPlayers}
+              onPlayerCountChange={setNumPlayers}
+              playerNames={playerNames}
+              onPlayerNameChange={(index, name) => setPlayerNames(previous => previous.map((current, currentIndex) => currentIndex === index ? name : current))}
+              botFlags={botFlags}
+              onBotToggle={index => setBotFlags(previous => previous.map((flag, currentIndex) => currentIndex === index ? !flag : flag))}
+              serverError={serverMatch.error}
+              serverLoading={serverMatch.loading}
+              joinMatchId={serverMatch.joinMatchId}
+              onJoinMatchIdChange={serverMatch.setJoinMatchId}
+              onJoin={() => void serverMatch.join()}
+              onStart={() => void initGame()}
+            />
           )}
 
           {/* ==================== PLAYING / ACTION PHASE ==================== */}
@@ -894,6 +679,13 @@ export default function App() {
             >
               {/* Sidebar: Players List */}
               <div className="lg:col-span-1 space-y-3">
+                {gameMode === 'server' && serverMatch.matchId && (
+                  <div className="card p-3 bg-accent-light/50 border-accent/20">
+                    <div className="label mb-1">Código da sala</div>
+                    <code className="text-[11px] break-all select-all text-accent">{serverMatch.matchId}</code>
+                    <p className="text-[11px] text-ink-muted mt-2">Compartilhe para outro jogador entrar.</p>
+                  </div>
+                )}
                 <div className="label mb-4">Expedição Atual</div>
                 {players.map((p, idx) => (
                   <div 
@@ -941,6 +733,7 @@ export default function App() {
                       </p>
                       <button
                         onClick={drawAction}
+                        disabled={serverMatch.loading || (gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) !== currentPlayerIndex)}
                         className="btn btn-accent btn-lg shadow-md hover:shadow-lg gap-3"
                         id="btn-draw-action"
                       >
@@ -994,6 +787,7 @@ export default function App() {
 
                           <button
                             onClick={nextTurn}
+                            disabled={serverMatch.loading || (gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) !== currentPlayerIndex)}
                             className="btn btn-primary btn-lg w-full gap-2"
                             id="btn-next-turn"
                           >
@@ -1006,14 +800,20 @@ export default function App() {
                   )}
                 </div>
 
+                {serverMatch.error && (
+                  <div className="card p-4 border-danger/30 bg-danger-light text-danger text-sm" role="alert">
+                    {serverMatch.error}
+                  </div>
+                )}
+
                 {/* Current Player's Hand */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-end">
                     <div className="label">Sua Coleção de Bioindicadores</div>
-                    <div className="text-sm font-mono">Total: <span className="font-bold">{players[currentPlayerIndex].score} pontos</span></div>
+                    <div className="text-sm font-mono">Total: <span className="font-bold">{players[handPlayerIndex]?.score ?? 0} pontos</span></div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
-                    {players[currentPlayerIndex].hand.map((card) => (
+                    {players[handPlayerIndex]?.hand.map((card) => (
                       <motion.div
                         layout
                         key={card.id}
@@ -1070,7 +870,7 @@ export default function App() {
                         </div>
                       </motion.div>
                     ))}
-                    {players[currentPlayerIndex].hand.length === 0 && (
+                    {(players[handPlayerIndex]?.hand.length ?? 0) === 0 && (
                       <div className="col-span-full py-12 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-ink-muted italic">
                         Sua mão está vazia.
                       </div>
@@ -1138,27 +938,15 @@ export default function App() {
                 </button>
               </div>
 
-              {scoreSaved && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-success-light border border-success/20 rounded-lg text-success text-sm font-semibold mb-6"
-                >
-                  ✓ Resultado salvo no seu perfil
-                </motion.div>
-              )}
-
-              {saveError && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-danger-light border border-danger/20 rounded-lg text-danger text-sm font-semibold mb-6"
-                >
-                  ✗ Não foi possível salvar o resultado. Verifique sua conexão.
-                </motion.div>
-              )}
-
-              
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-surface-alt border border-border rounded-lg text-ink-secondary text-sm font-semibold mb-6"
+              >
+                {gameMode === 'server'
+                  ? 'Resultado calculado pela API e elegível ao ranking oficial.'
+                  : 'Partida local: o resultado não é publicado no ranking. Apenas partidas validadas pela API geram pontuação oficial.'}
+              </motion.div>
 
               <div className="flex flex-wrap gap-3 justify-center">
                 <button
@@ -1169,7 +957,7 @@ export default function App() {
                   <Trophy size={18} /> Ver Ranking
                 </button>
                 <button
-                  onClick={() => { setScoreSaved(false); setPhase('setup'); }}
+                  onClick={() => setPhase('setup')}
                   className="btn btn-primary btn-lg"
                   id="btn-new-game"
                 >
@@ -1226,6 +1014,22 @@ export default function App() {
                 <div className="card p-8 text-center">
                   <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                   <p className="text-ink-muted font-mono text-sm">Carregando ranking...</p>
+                </div>
+              ) : leaderboardError ? (
+                <div className="card p-8 text-center space-y-4" role="alert">
+                  <AlertTriangle size={40} className="text-danger mx-auto opacity-80" />
+                  <div>
+                    <p className="font-semibold text-danger">Não foi possível carregar o ranking.</p>
+                    <p className="text-sm text-ink-muted mt-1">{leaderboardError}</p>
+                  </div>
+                  <button
+                    onClick={fetchLeaderboard}
+                    className="btn btn-secondary mx-auto"
+                    disabled={leaderboardLoading}
+                  >
+                    <RotateCcw size={16} className={leaderboardLoading ? 'animate-spin' : ''} />
+                    Tentar novamente
+                  </button>
                 </div>
               ) : leaderboardData.length === 0 ? (
                 <div className="card p-8 text-center space-y-4">
@@ -1294,21 +1098,12 @@ export default function App() {
                           <tbody className="divide-y divide-border">
                             {leaderboardData.map((entry, idx) => {
                               const quality = getWaterQuality(entry.score);
-                              const isCurrentUser = entry.user_id === user?.id;
-                              // ranking_global já traz full_name direto no campo;
-                              // o fallback usa o join antigo (profiles.full_name)
-                              const entryWithProfile = entry as GameScore & { full_name?: string; profiles?: { full_name: string } | null };
-                              const playerName = entryWithProfile.full_name
-                                || entryWithProfile.profiles?.full_name
-                                || (isCurrentUser ? profile?.full_name : null)
-                                || 'Anônimo';
+                              const playerName = entry.full_name || 'Anônimo';
                               return (
                                 <tr
-                                  key={entry.id}
+                                  key={`${entry.played_at}-${idx}`}
                                   className={`transition-colors ${
-                                    isCurrentUser
-                                      ? 'bg-accent-light/40 border-l-2 border-l-accent'
-                                      : idx === 0
+                                    idx === 0
                                       ? 'bg-warning-light/30'
                                       : 'hover:bg-surface-alt'
                                   }`}
@@ -1326,11 +1121,6 @@ export default function App() {
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                       <span className="font-serif italic font-semibold">{playerName}</span>
-                                      {isCurrentUser && (
-                                        <span className="px-1.5 py-0.5 bg-accent text-white text-[10px] font-bold uppercase tracking-wider rounded">
-                                          Você
-                                        </span>
-                                      )}
                                     </div>
                                   </td>
                                   <td className="px-4 py-3 font-mono font-bold">{entry.score}</td>

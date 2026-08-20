@@ -1,0 +1,133 @@
+name: jogo-clube
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    image: ${FRONTEND_IMAGE:-jogo-clube-frontend:local}
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      CSP_CONNECT_SRC: "${CSP_CONNECT_SRC:-'self'}"
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    networks:
+      - edge
+      - app
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  api:
+    profiles: [backend]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    image: ${API_IMAGE:-jogo-clube-api:local}
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL:?Defina DATABASE_URL para iniciar o perfil backend}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://${SITE_ADDRESS:-localhost}}
+      APP_BASE_URL: ${APP_BASE_URL:-https://${SITE_ADDRESS:-localhost}}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      EMAIL_MODE: ${EMAIL_MODE:-smtp}
+      EMAIL_FROM: ${EMAIL_FROM:-Clube de Ciências <no-reply@localhost>}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    expose:
+      - "3001"
+    networks:
+      - app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "npm run db:migrate && node dist-server/index.js"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  db:
+    profiles: [backend]
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-jogo_clube}
+      POSTGRES_USER: ${POSTGRES_USER:-jogo_clube}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD para iniciar o perfil backend}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app
+    expose:
+      - "5432"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "7"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  edge:
+    driver: bridge
+  app:
+    driver: bridge
+    internal: true
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:

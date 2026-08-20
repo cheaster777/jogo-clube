@@ -1,26 +1,43 @@
-import { useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-type AuthMode = 'login' | 'signup' | 'forgot';
+type AuthMode = 'login' | 'signup' | 'forgot' | 'verify' | 'reset';
 
 export default function AuthScreen() {
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, resendEmailVerification, confirmEmail, confirmPasswordReset } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verificationToken = params.get('verify');
+    const resetToken = params.get('reset');
+    if (verificationToken) {
+      setToken(verificationToken);
+      setMode('verify');
+    } else if (resetToken) {
+      setToken(resetToken);
+      setMode('reset');
+    }
+  }, []);
 
   const resetForm = () => {
     setEmail('');
     setPassword('');
     setFullName('');
+    setToken('');
     setError(null);
     setSuccess(null);
+    setNeedsVerification(false);
   };
 
   const switchMode = (newMode: AuthMode) => {
@@ -32,11 +49,22 @@ export default function AuthScreen() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNeedsVerification(false);
 
     const { error } = await signIn(email, password);
     if (error) {
       setError(translateError(error.message));
+      setNeedsVerification(error.message.toLowerCase().includes('não confirmado'));
     }
+    setLoading(false);
+  };
+
+  const handleResendVerification = async () => {
+    setLoading(true);
+    setError(null);
+    const { error } = await resendEmailVerification(email);
+    if (error) setError(translateError(error.message));
+    else setSuccess('Se a conta estiver pendente, um novo link foi enviado para o email informado.');
     setLoading(false);
   };
 
@@ -45,8 +73,8 @@ export default function AuthScreen() {
     setLoading(true);
     setError(null);
 
-    if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
+    if (password.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.');
       setLoading(false);
       return;
     }
@@ -74,12 +102,38 @@ export default function AuthScreen() {
     setLoading(false);
   };
 
+  const handleVerifyEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const { error } = await confirmEmail(token);
+    if (error) setError(translateError(error.message));
+    else setSuccess('Email confirmado! Sua conta está pronta para acessar o jogo.');
+    setLoading(false);
+  };
+
+  const handleConfirmReset = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    if (password.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.');
+      setLoading(false);
+      return;
+    }
+    const { error } = await confirmPasswordReset(token, password);
+    if (error) setError(translateError(error.message));
+    else setSuccess('Senha atualizada! Você já pode entrar.');
+    setLoading(false);
+  };
+
   const translateError = (msg: string): string => {
     if (msg.includes('Invalid login credentials')) return 'Email ou senha incorretos.';
     if (msg.includes('Email not confirmed')) return 'Email ainda não confirmado. Verifique sua caixa de entrada.';
+    if (msg.includes('Email ainda não confirmado')) return 'Email ainda não confirmado. Verifique sua caixa de entrada.';
     if (msg.includes('User already registered')) return 'Este email já está cadastrado.';
     if (msg.includes('rate limit')) return 'Muitas tentativas. Aguarde um momento.';
-    if (msg.includes('Password should be')) return 'A senha deve ter pelo menos 6 caracteres.';
+    if (msg.includes('Password should be')) return 'A senha deve ter pelo menos 8 caracteres.';
     return msg;
   };
 
@@ -87,6 +141,8 @@ export default function AuthScreen() {
     login: { title: 'Bem-vindo de volta', subtitle: 'Entre na sua conta para continuar' },
     signup: { title: 'Criar Conta', subtitle: 'Junte-se à expedição científica' },
     forgot: { title: 'Recuperar Senha', subtitle: 'Enviaremos um link para seu email' },
+    verify: { title: 'Confirmar Email', subtitle: 'Valide seu endereço para ativar a conta' },
+    reset: { title: 'Nova Senha', subtitle: 'Escolha uma senha nova para sua conta' },
   };
 
   return (
@@ -209,6 +265,17 @@ export default function AuthScreen() {
                     {loading ? <Loader2 size={18} className="animate-spin" /> : 'Entrar'}
                   </button>
 
+                  {needsVerification && (
+                    <button
+                      type="button"
+                      onClick={() => void handleResendVerification()}
+                      disabled={loading}
+                      className="btn btn-secondary w-full"
+                    >
+                      Reenviar confirmação de email
+                    </button>
+                  )}
+
                   <p className="text-center text-sm text-ink-secondary">
                     Não tem uma conta?{' '}
                     <button
@@ -265,9 +332,9 @@ export default function AuthScreen() {
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         className="input-field pl-10"
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Mínimo 8 caracteres"
                         required
-                        minLength={6}
+                        minLength={8}
                         autoComplete="new-password"
                         id="signup-password"
                       />
@@ -293,6 +360,34 @@ export default function AuthScreen() {
                       Entrar
                     </button>
                   </p>
+                </form>
+              )}
+
+              {mode === 'verify' && !success && (
+                <form onSubmit={handleVerifyEmail} className="space-y-4">
+                  <div>
+                    <label htmlFor="verification-token" className="label block mb-1.5">Token de confirmação</label>
+                    <input id="verification-token" value={token} onChange={event => setToken(event.target.value)} className="input-field font-mono text-xs" required />
+                  </div>
+                  <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : 'Confirmar email'}
+                  </button>
+                </form>
+              )}
+
+              {mode === 'reset' && !success && (
+                <form onSubmit={handleConfirmReset} className="space-y-4">
+                  <div>
+                    <label htmlFor="reset-token" className="label block mb-1.5">Token de recuperação</label>
+                    <input id="reset-token" value={token} onChange={event => setToken(event.target.value)} className="input-field font-mono text-xs" required />
+                  </div>
+                  <div>
+                    <label htmlFor="new-password" className="label block mb-1.5">Nova senha</label>
+                    <input id="new-password" type="password" value={password} onChange={event => setPassword(event.target.value)} className="input-field" minLength={8} autoComplete="new-password" required />
+                  </div>
+                  <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : 'Atualizar senha'}
+                  </button>
                 </form>
               )}
 

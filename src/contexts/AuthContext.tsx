@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { ApiError, ApiProfile, ApiUser, apiClient, isApiConfigured, unwrapApiData } from '../lib/api';
 
-export interface Profile {
-  id: string;
-  full_name: string;
-  email: string;
-  created_at: string;
+export interface User extends ApiUser {}
+
+export interface Session {
+  expires_at?: string | null;
+}
+
+export interface Profile extends ApiProfile {
+  email?: string;
 }
 
 export interface GameScore {
@@ -17,33 +19,47 @@ export interface GameScore {
   quality_diagnosis: string;
   families_count: number;
   played_at: string;
+  full_name?: string;
 }
+
+type AuthError = ApiError;
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  localMode: boolean;
+  authError: string | null;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
-  saveGameScore: (score: number, qualityCategory: string, qualityDiagnosis: string, familiesCount: number) => Promise<void>;
+  resendEmailVerification: (email: string) => Promise<{ error: AuthError | null }>;
+  confirmEmail: (token: string) => Promise<{ error: AuthError | null }>;
+  confirmPasswordReset: (token: string, newPassword: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function loadProfile(userId: string): Promise<Profile | null> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (data) return data as Profile;
-    if (attempt < 3) await new Promise(r => setTimeout(r, 800));
-  }
-  return null;
+interface AuthPayload {
+  user?: ApiUser | null;
+  profile?: ApiProfile | null;
+  session?: Session | null;
+}
+
+function getAuthPayload(response: AuthPayload | { data?: AuthPayload }): AuthPayload {
+  return unwrapApiData(response) || {};
+}
+
+function toApiError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+  return new ApiError('Não foi possível concluir a operação.', 0, 'UNKNOWN_ERROR', error);
+}
+
+function normalizeProfile(profile: ApiProfile | null | undefined, user: ApiUser | null | undefined): Profile | null {
+  if (!profile || !user) return null;
+  return { ...profile, email: user.email };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -51,151 +67,121 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const localMode = !isApiConfigured && import.meta.env.DEV;
 
-  // Listen for auth state changes
   useEffect(() => {
-    const timeout = setTimeout(() => setLoading(false), 8000);
     let mounted = true;
+
+    if (localMode) {
+      setLoading(false);
+      return () => { mounted = false; };
+    }
 
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-
+        const response = getAuthPayload(await apiClient.getMe());
         if (!mounted) return;
-
-        if (session?.user) {
-          // Validate session by fetching the user from Supabase API
-          const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-
-          if (!mounted) return;
-
-          if (userError || !currentUser) {
-            // Session token is stale/invalid — clear it
-            await supabase.auth.signOut();
-            if (mounted) {
-              setSession(null);
-              setUser(null);
-              setProfile(null);
-            }
-          } else {
-            setSession(session);
-            setUser(currentUser);
-
-            const profileData = await loadProfile(currentUser.id);
-            if (mounted) {
-              if (profileData) {
-                setProfile(profileData);
-              } else {
-                console.error("Não foi possível carregar o perfil no init.");
-                // Profile missing — sign out to avoid broken state
-                await supabase.auth.signOut();
-                setSession(null);
-                setUser(null);
-                setProfile(null);
-              }
-            }
-          }
-        }
-      } catch {
-        if (mounted) {
-          setUser(null);
-          setProfile(null);
-          setSession(null);
-        }
+        setUser(response.user ?? null);
+        setProfile(normalizeProfile(response.profile, response.user));
+        setSession(response.session ?? null);
+        setAuthError(null);
+      } catch (error) {
+        if (!mounted) return;
+        const apiError = toApiError(error);
+        if (apiError.status !== 401) setAuthError(apiError.message);
+        setUser(null);
+        setProfile(null);
+        setSession(null);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      if (mounted) setLoading(false);
-      clearTimeout(timeout);
     };
 
     init();
+    return () => { mounted = false; };
+  }, [localMode]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
+  const applyAuthResponse = (response: AuthPayload | { data?: AuthPayload }) => {
+    const payload = getAuthPayload(response);
+    const nextUser = payload.user ?? null;
+    setUser(nextUser);
+    setProfile(normalizeProfile(payload.profile, nextUser));
+    setSession(payload.session ?? null);
+    setAuthError(null);
+  };
 
-        if (!session?.user) {
-          setProfile(null);
-          return;
-        }
-
-        const profileData = await loadProfile(session.user.id);
-        if (mounted) {
-          if (profileData) {
-            setProfile(profileData);
-          } else {
-            console.error("Não foi possível carregar o perfil após login.");
-            setProfile(null);
-          }
-        }
-      }
-    );
-
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Sign up with email + password + full name
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    });
-    return { error };
+    try {
+      const response = await apiClient.register({ email, password, fullName });
+      applyAuthResponse(response);
+      return { error: null };
+    } catch (error) {
+      return { error: toApiError(error) };
+    }
   };
 
-  // Sign in with email + password
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    try {
+      const response = await apiClient.login({ email, password });
+      applyAuthResponse(response);
+      return { error: null };
+    } catch (error) {
+      return { error: toApiError(error) };
+    }
   };
 
-  // Sign out — clear session and state
   const signOut = async () => {
-    await supabase.auth.signOut();
+    if (!localMode) {
+      try {
+        await apiClient.logout();
+      } finally {
+        setUser(null);
+        setProfile(null);
+        setSession(null);
+      }
+      return;
+    }
+
     setUser(null);
     setProfile(null);
     setSession(null);
   };
 
-  // Reset password
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    });
-    return { error };
+    try {
+      await apiClient.requestPasswordReset(email);
+      return { error: null };
+    } catch (error) {
+      return { error: toApiError(error) };
+    }
   };
 
-  // Save game score — throws on failure so caller can show error UI
-  const saveGameScore = async (
-    score: number,
-    qualityCategory: string,
-    qualityDiagnosis: string,
-    familiesCount: number
-  ) => {
-    if (!user) return;
+  const resendEmailVerification = async (email: string) => {
+    try {
+      await apiClient.resendEmailVerification(email);
+      return { error: null };
+    } catch (error) {
+      return { error: toApiError(error) };
+    }
+  };
 
-    const { error } = await supabase.from('game_scores').insert({
-      user_id: user.id,
-      score,
-      quality_category: qualityCategory,
-      quality_diagnosis: qualityDiagnosis,
-      families_count: familiesCount,
-    });
+  const confirmEmail = async (token: string) => {
+    try {
+      const response = await apiClient.confirmEmail(token);
+      applyAuthResponse(response);
+      return { error: null };
+    } catch (error) {
+      return { error: toApiError(error) };
+    }
+  };
 
-    if (error) {
-      console.error('Failed to save score:', error.message);
-      throw new Error(error.message);
+  const confirmPasswordReset = async (token: string, newPassword: string) => {
+    try {
+      await apiClient.confirmPasswordReset(token, newPassword);
+      return { error: null };
+    } catch (error) {
+      return { error: toApiError(error) };
     }
   };
 
@@ -206,11 +192,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         session,
         loading,
+        localMode,
+        authError,
         signUp,
         signIn,
         signOut,
         resetPassword,
-        saveGameScore,
+        resendEmailVerification,
+        confirmEmail,
+        confirmPasswordReset,
       }}
     >
       {children}
