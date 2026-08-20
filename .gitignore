@@ -7,6 +7,7 @@ test-results/
 playwright-report/
 .playwright-mcp/
 graphify-out/
+.impeccable/live/
 .DS_Store
 *.log
 .env*
