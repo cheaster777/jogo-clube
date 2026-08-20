@@ -78,7 +78,7 @@ export default function SetupPanel({
                 API validada
               </button>
             </div>
-            {!apiConfigured && <p className="text-xs text-ink-muted mt-2">Configure VITE_API_BASE_URL para ativar partidas validadas.</p>}
+            {!apiConfigured && <p className="text-xs text-ink-muted mt-2">Partidas com ranking oficial estarão disponíveis em breve.</p>}
           </div>
 
           <div>

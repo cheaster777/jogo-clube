@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { 
   Trophy, 
   Users, 
@@ -41,14 +41,35 @@ const getWaterQuality = (score: number) => {
   return WATER_QUALITY_DATA.find(q => score >= q.minScore && score <= q.maxScore) || WATER_QUALITY_DATA[WATER_QUALITY_DATA.length - 1];
 };
 
-// Helper: determine if badge text should be dark based on background color brightness
-const shouldUseDarkText = (hexColor: string): boolean => {
+// Helper: WCAG relative luminance + contrast ratio, used to pick whichever of
+// black/white text actually reads better against a given background color
+// (a fixed luminance threshold doesn't reliably predict real AA contrast).
+function srgbChannelToLinear(channel8bit: number): number {
+  const c = channel8bit / 255;
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(hexColor: string): number {
   const hex = hexColor.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6;
+  return 0.2126 * srgbChannelToLinear(r) + 0.7152 * srgbChannelToLinear(g) + 0.0722 * srgbChannelToLinear(b);
+}
+
+function contrastRatio(luminanceA: number, luminanceB: number): number {
+  const lighter = Math.max(luminanceA, luminanceB);
+  const darker = Math.min(luminanceA, luminanceB);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+// Helper: determine if badge text should be dark, by picking whichever of
+// black/white text yields the higher WCAG contrast ratio against the background.
+const shouldUseDarkText = (hexColor: string): boolean => {
+  const bgLuminance = relativeLuminance(hexColor);
+  const contrastWithBlack = contrastRatio(bgLuminance, relativeLuminance('#1C1917'));
+  const contrastWithWhite = contrastRatio(bgLuminance, relativeLuminance('#FFFFFF'));
+  return contrastWithBlack >= contrastWithWhite;
 };
 
 type GamePhase = 'home' | 'setup' | 'playing' | 'action' | 'gameOver' | 'leaderboard';
@@ -88,11 +109,59 @@ export default function App() {
   });
 
   const [showRules, setShowRules] = useState(false);
+  const rulesModalRef = useRef<HTMLDivElement>(null);
+  const rulesCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const rulesTriggerElementRef = useRef<HTMLElement | null>(null);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const leaderboardRequestId = useRef(0);
+  // Deltas de pontuação (id do jogador -> variação) causados pela última carta
+  // de ação puxada, para deixar visível quando o efeito atinge outro jogador.
+  const [scoreDeltas, setScoreDeltas] = useState<Record<string, number>>({});
+
+  // Foco/teclado do modal de Regras: guarda quem abriu, foca o botão de
+  // fechar ao abrir, restaura o foco ao fechar, Esc fecha, Tab fica preso.
+  useEffect(() => {
+    if (showRules) {
+      rulesTriggerElementRef.current = document.activeElement as HTMLElement | null;
+      rulesCloseButtonRef.current?.focus();
+    } else {
+      rulesTriggerElementRef.current?.focus();
+    }
+  }, [showRules]);
+
+  useEffect(() => {
+    if (!showRules) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowRules(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !rulesModalRef.current) return;
+
+      const focusable = rulesModalRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showRules]);
 
   // Auto-fill player 1 name from the authenticated API profile.
   useEffect(() => {
@@ -221,7 +290,21 @@ export default function App() {
     if (!localGame) return;
 
     try {
+      const prevScoresById: Record<string, number> = {};
+      localGame.players.forEach(p => { prevScoresById[String(p.id)] = p.score; });
       const nextGame = dispatchLocalCommand(localGame, { type: command });
+
+      if (command === 'DRAW_ACTION') {
+        const deltas: Record<string, number> = {};
+        nextGame.players.forEach(p => {
+          const prev: number = prevScoresById[String(p.id)] ?? p.score;
+          if (p.score !== prev) deltas[String(p.id)] = p.score - prev;
+        });
+        setScoreDeltas(deltas);
+      } else {
+        setScoreDeltas({});
+      }
+
       syncLocalGame(nextGame);
     } catch (error) {
       console.error('Falha ao executar comando local:', error);
@@ -283,6 +366,7 @@ export default function App() {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen bg-bg text-ink font-sans selection:bg-accent selection:text-white">
       {/* ==================== HEADER ==================== */}
       <header className="border-b border-border bg-surface/80 backdrop-blur-md p-4 md:p-6 flex justify-between items-center sticky top-0 z-50">
@@ -534,9 +618,11 @@ export default function App() {
                               background: `radial-gradient(circle at 50% 50%, ${card.color}20 0%, #FAFAF9 70%)`
                             }}
                           >
-                            <img 
-                              src={card.image} 
+                            <img
+                              src={card.image}
                               alt={card.name}
+                              loading="lazy"
+                              decoding="async"
                               className="absolute inset-0 w-full h-[120%] object-contain top-1/2 -translate-y-1/2 drop-shadow-lg group-hover:drop-shadow-xl group-hover:scale-110 group-hover:-translate-y-[55%] transition-all duration-500 ease-out"
                               referrerPolicy="no-referrer"
                             />
@@ -587,10 +673,12 @@ export default function App() {
 
                           <div className="h-48 w-full overflow-hidden relative bg-surface-alt flex items-center justify-center">
                             <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #1C1917 0, #1C1917 1px, transparent 0, transparent 50%)', backgroundSize: '10px 10px' }}></div>
-                            <img 
-                              src={card.image} 
+                            <img
+                              src={card.image}
                               alt={card.title}
-                              className={`w-full h-[140%] object-contain drop-shadow-xl transition-all duration-500 
+                              loading="lazy"
+                              decoding="async"
+                              className={`w-full h-[140%] object-contain drop-shadow-xl transition-all duration-500
                                 ${card.category === 'impact' ? 'group-hover:scale-110 group-hover:rotate-2' : 'group-hover:scale-110 group-hover:-rotate-2'}
                               `}
                               referrerPolicy="no-referrer"
@@ -731,14 +819,21 @@ export default function App() {
                       <p className="max-w-md mx-auto text-ink-secondary leading-relaxed">
                         O ambiente está em constante mudança. Você deve enfrentar as consequências das ações humanas ou colher os frutos da preservação.
                       </p>
-                      <button
-                        onClick={drawAction}
-                        disabled={serverMatch.loading || (gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) !== currentPlayerIndex)}
-                        className="btn btn-accent btn-lg shadow-md hover:shadow-lg gap-3"
-                        id="btn-draw-action"
-                      >
-                        Puxar Carta de Ação
-                      </button>
+                      {players[currentPlayerIndex]?.isBot ? (
+                        <div className="flex items-center justify-center gap-3 text-ink-secondary" role="status" aria-live="polite">
+                          <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                          <span className="font-mono text-sm">{players[currentPlayerIndex].name} está jogando...</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={drawAction}
+                          disabled={serverMatch.loading || (gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) !== currentPlayerIndex)}
+                          className="btn btn-accent btn-lg shadow-md hover:shadow-lg gap-3"
+                          id="btn-draw-action"
+                        >
+                          Puxar Carta de Ação
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <motion.div 
@@ -761,12 +856,13 @@ export default function App() {
                         <div className="h-72 md:h-96 w-full overflow-hidden relative bg-surface-alt flex items-center justify-center">
                           <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #1C1917 0, #1C1917 1px, transparent 0, transparent 50%)', backgroundSize: '10px 10px' }}></div>
                           
-                          <motion.img 
+                          <motion.img
                             initial={{ scale: 0.8, rotate: lastAction.category === 'impact' ? -10 : 10, y: 50, opacity: 0 }}
                             animate={{ scale: 1.05, rotate: lastAction.category === 'impact' ? 2 : -2, y: 0, opacity: 1 }}
                             transition={{ type: "spring", stiffness: 50, damping: 10 }}
-                            src={lastAction.image} 
+                            src={lastAction.image}
                             alt={lastAction.title}
+                            decoding="async"
                             className="absolute inset-0 w-full h-[140%] top-1/2 -translate-y-1/2 object-contain drop-shadow-xl origin-center"
                             referrerPolicy="no-referrer"
                           />
@@ -783,16 +879,39 @@ export default function App() {
                           <div className="p-4 bg-surface-alt rounded-lg border border-border mb-6">
                             <div className="label mb-2">Resultado na Mesa</div>
                             <div className="font-bold text-sm tracking-tight">{actionMessage}</div>
+                            {gameMode === 'local' && Object.keys(scoreDeltas).length > 0 && (
+                              <ul className="mt-3 pt-3 border-t border-border space-y-1">
+                                {Object.entries(scoreDeltas).map(([playerId, delta]: [string, number]) => {
+                                  const player = players.find(p => p.id === Number(playerId));
+                                  if (!player || delta === 0) return null;
+                                  return (
+                                    <li key={playerId} className="flex justify-between items-center text-xs font-mono">
+                                      <span className="text-ink-secondary">{player.name}</span>
+                                      <span className={delta > 0 ? 'text-success font-bold' : 'text-danger font-bold'}>
+                                        {delta > 0 ? '+' : ''}{delta} pts
+                                      </span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
                           </div>
 
-                          <button
-                            onClick={nextTurn}
-                            disabled={serverMatch.loading || (gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) !== currentPlayerIndex)}
-                            className="btn btn-primary btn-lg w-full gap-2"
-                            id="btn-next-turn"
-                          >
-                            Próximo Turno <ChevronRight size={18} />
-                          </button>
+                          {players[currentPlayerIndex]?.isBot ? (
+                            <div className="flex items-center justify-center gap-3 text-ink-secondary py-3" role="status" aria-live="polite">
+                              <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                              <span className="font-mono text-sm">{players[currentPlayerIndex].name} está decidindo o próximo passo...</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={nextTurn}
+                              disabled={serverMatch.loading || (gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) !== currentPlayerIndex)}
+                              className="btn btn-primary btn-lg w-full gap-2"
+                              id="btn-next-turn"
+                            >
+                              Próximo Turno <ChevronRight size={18} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -842,9 +961,11 @@ export default function App() {
                             background: `radial-gradient(circle at 50% 50%, ${card.color}20 0%, #FAFAF9 70%)`
                           }}
                         >
-                          <img 
-                            src={card.image} 
+                          <img
+                            src={card.image}
                             alt={card.name}
+                            loading="lazy"
+                            decoding="async"
                             className="absolute inset-0 w-full h-[120%] object-contain top-1/2 -translate-y-1/2 drop-shadow-md group-hover:drop-shadow-xl group-hover:scale-110 group-hover:-translate-y-[55%] transition-all duration-500 ease-out"
                             referrerPolicy="no-referrer"
                           />
@@ -1173,7 +1294,8 @@ export default function App() {
             aria-modal="true"
             aria-label="Regras do Jogo"
           >
-            <motion.div 
+            <motion.div
+              ref={rulesModalRef}
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
@@ -1185,8 +1307,9 @@ export default function App() {
                   <h2 className="text-2xl md:text-3xl font-bold italic font-serif tracking-tight">Regras do Jogo</h2>
                   <p className="text-xs font-mono uppercase tracking-widest text-ink-muted mt-1">Clube de Ciências de bona — Bioindicadores</p>
                 </div>
-                <button 
-                  onClick={() => setShowRules(false)} 
+                <button
+                  ref={rulesCloseButtonRef}
+                  onClick={() => setShowRules(false)}
                   className="p-2 hover:bg-surface-alt rounded-lg transition-colors"
                   aria-label="Fechar regras"
                   id="btn-close-rules"
@@ -1259,42 +1382,27 @@ export default function App() {
                 <section>
                   <h3 className="label font-bold mb-3">Valores das Cartas</h3>
                   <div className="grid grid-cols-3 gap-2 text-xs font-mono">
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#3b82f6' }}>10</span>
-                      <span>Máximo</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#60a5fa' }}>8</span>
-                      <span>Alto</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#22c55e' }}>7</span>
-                      <span>Médio-Alto</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#86efac' }}>6</span>
-                      <span>Médio</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#fde047' }}>5</span>
-                      <span>Médio</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#fb923c' }}>4</span>
-                      <span>Médio-Baixo</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#f97316' }}>3</span>
-                      <span>Baixo</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#ea580c' }}>2</span>
-                      <span>Baixo</span>
-                    </div>
-                    <div className="card p-2 flex flex-col items-center">
-                      <span className="text-xl font-bold" style={{ color: '#dc2626' }}>1</span>
-                      <span>Mínimo</span>
-                    </div>
+                    {[
+                      { value: '10', color: '#3b82f6', label: 'Máximo' },
+                      { value: '8', color: '#60a5fa', label: 'Alto' },
+                      { value: '7', color: '#22c55e', label: 'Médio-Alto' },
+                      { value: '6', color: '#86efac', label: 'Médio' },
+                      { value: '5', color: '#fde047', label: 'Médio' },
+                      { value: '4', color: '#fb923c', label: 'Médio-Baixo' },
+                      { value: '3', color: '#f97316', label: 'Baixo' },
+                      { value: '2', color: '#ea580c', label: 'Baixo' },
+                      { value: '1', color: '#dc2626', label: 'Mínimo' },
+                    ].map(({ value, color, label }) => (
+                      <div key={value} className="card p-2 flex flex-col items-center gap-1.5">
+                        <span
+                          className="score-badge w-9 h-9 text-sm"
+                          style={{ backgroundColor: color, color: shouldUseDarkText(color) ? '#1C1917' : '#ffffff' }}
+                        >
+                          {value}
+                        </span>
+                        <span>{label}</span>
+                      </div>
+                    ))}
                   </div>
                   <p className="mt-2 text-xs italic text-ink-muted">Não existe carta com valor 9 no jogo.</p>
                 </section>
@@ -1367,5 +1475,6 @@ export default function App() {
         </div>
       </footer>
     </div>
+    </MotionConfig>
   );
 }

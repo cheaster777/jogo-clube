@@ -79,7 +79,7 @@ export function useServerMatch({ enabled, phase, playerCount, playerNames }: Use
 
   const start = useCallback(async () => {
     if (!isApiConfigured) {
-      setError('A API não está configurada para partidas validadas.');
+      setError('Partidas com ranking oficial ainda não estão disponíveis neste ambiente.');
       return;
     }
     setLoading(true);

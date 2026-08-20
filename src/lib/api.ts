@@ -101,7 +101,7 @@ async function parseResponse(response: Response): Promise<unknown> {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   if (!isApiConfigured) {
-    throw new ApiError('A API da partida ainda não foi configurada.', 0, 'API_NOT_CONFIGURED');
+    throw new ApiError('Partidas com ranking oficial ainda não estão disponíveis neste ambiente.', 0, 'API_NOT_CONFIGURED');
   }
 
   const controller = new AbortController();
