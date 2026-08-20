@@ -250,16 +250,18 @@ export async function executeCommand(
         );
       }
       if (nextState.phase === 'gameOver') {
-        const creator = nextState.players.find(player => player.id === stored.players.find(item => item.userId === stored.match.created_by)?.seat);
-        if (creator) {
-          const quality = waterQualityForScore(creator.score);
+        for (const dbPlayer of stored.players) {
+          if (!dbPlayer.userId) continue; // assento de bot ou nunca ocupado
+          const finalPlayer = nextState.players.find(player => player.id === dbPlayer.seat);
+          if (!finalPlayer) continue;
+          const quality = waterQualityForScore(finalPlayer.score);
           await client.query(
             `INSERT INTO game_scores
               (match_id, user_id, score, quality_category, quality_diagnosis, families_count, rule_version)
              VALUES ($1, $2, $3, $4, $5, $6, '1.0.0')
-             ON CONFLICT (match_id) DO NOTHING`,
-            [matchId, stored.match.created_by, creator.score, quality.category,
-              quality.diagnosis, creator.hand.length],
+             ON CONFLICT (match_id, user_id) DO NOTHING`,
+            [matchId, dbPlayer.userId, finalPlayer.score, quality.category,
+              quality.diagnosis, finalPlayer.hand.length],
           );
         }
       }

@@ -245,9 +245,10 @@ test('integração PostgreSQL: conta, sala online, comandos e finalização', {
       'SELECT user_id, score, quality_category FROM game_scores WHERE match_id = $1',
       [matchId],
     );
-    assert.equal(score.rowCount, 1);
-    assert.equal(String(score.rows[0].user_id), first.userId);
-    assert.equal(typeof score.rows[0].score, 'number');
+    assert.equal(score.rowCount, 2);
+    const scoreByUser = new Map(score.rows.map((row: any) => [String(row.user_id), row]));
+    assert.equal(typeof scoreByUser.get(first.userId)?.score, 'number');
+    assert.equal(typeof scoreByUser.get(second.userId)?.score, 'number');
 
     const events = await jsonRequest(baseUrl, `/api/v1/matches/${matchId}/events?afterVersion=0`, {
       cookie: second.cookie,
@@ -261,6 +262,7 @@ test('integração PostgreSQL: conta, sala online, comandos e finalização', {
     assert.equal(ranking.status, 200);
     assert.equal(JSON.stringify(ranking.body).includes(firstEmail), false);
     assert.equal(ranking.body.some((entry: any) => entry.full_name === 'Jogadora CI'), true);
+    assert.equal(ranking.body.some((entry: any) => entry.full_name === 'Jogador dois'), true);
   } finally {
     if (matchId) await pool.query('DELETE FROM matches WHERE id = $1', [matchId]);
     if (userIds.length > 0) await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [userIds]);
