@@ -51,12 +51,14 @@ services:
       target: api
     image: ${API_IMAGE:-jogo-clube-api:local}
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3001
       DATABASE_URL: ${DATABASE_URL:?Defina DATABASE_URL para iniciar o perfil backend}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://${SITE_ADDRESS:-localhost}}
       APP_BASE_URL: ${APP_BASE_URL:-https://${SITE_ADDRESS:-localhost}}
       TRUST_PROXY: ${TRUST_PROXY:-true}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      RESET_TOKEN_EXPOSE: ${RESET_TOKEN_EXPOSE:-false}
       EMAIL_MODE: ${EMAIL_MODE:-smtp}
       EMAIL_FROM: ${EMAIL_FROM:-Clube de Ciências <no-reply@localhost>}
       SMTP_HOST: ${SMTP_HOST:-}
