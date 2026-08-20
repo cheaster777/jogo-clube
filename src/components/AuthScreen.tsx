@@ -214,7 +214,7 @@ export default function AuthScreen() {
               {mode === 'login' && (
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
-                    <label className="label block mb-1.5">Email</label>
+                    <label htmlFor="login-email" className="label block mb-1.5">Email</label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
@@ -324,7 +324,7 @@ export default function AuthScreen() {
                     </div>
                   </div>
                   <div>
-                    <label className="label block mb-1.5">Senha</label>
+                    <label htmlFor="signup-password" className="label block mb-1.5">Senha</label>
                     <div className="relative">
                       <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
@@ -394,7 +394,7 @@ export default function AuthScreen() {
               {mode === 'forgot' && !success && (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div>
-                    <label className="label block mb-1.5">Email</label>
+                    <label htmlFor="forgot-email" className="label block mb-1.5">Email</label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
