@@ -8,10 +8,15 @@ import { createApiRouter } from './routes';
 export function createApp(pool: Pool, config: AppConfig) {
   const app = express();
   app.disable('x-powered-by');
-  if (config.trustProxy) app.set('trust proxy', true);
+  if (config.trustProxy) app.set('trust proxy', 1);
 
   app.use((req: Request, res: Response, next) => {
     const origin = req.headers.origin;
+    const isSafeMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+    if (!isSafeMethod && origin && !config.corsOrigins.includes(origin)) {
+      res.status(403).json({ error: { code: 'CSRF_ORIGIN', message: 'Origem da solicitação não autorizada.' } });
+      return;
+    }
     if (origin && config.corsOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');

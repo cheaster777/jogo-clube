@@ -11,7 +11,14 @@ export function createPool(config: AppConfig): Pool {
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
-    ...(config.databaseSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    statement_timeout: config.databaseStatementTimeoutMs,
+    idle_in_transaction_session_timeout: config.databaseIdleInTransactionTimeoutMs,
+    ...(config.databaseSsl ? {
+      ssl: {
+        rejectUnauthorized: config.databaseSslRejectUnauthorized,
+        ...(config.databaseSslCa ? { ca: config.databaseSslCa } : {}),
+      },
+    } : {}),
   };
 
   return new Pool(poolConfig);

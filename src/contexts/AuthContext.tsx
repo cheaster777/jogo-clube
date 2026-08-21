@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { ApiError, ApiProfile, ApiUser, apiClient, isApiConfigured, unwrapApiData } from '../lib/api';
+import { ApiError, ApiProfile, ApiUser, apiClient, isApiConfigured, setUnauthorizedHandler, unwrapApiData } from '../lib/api';
 
 export interface User extends ApiUser {}
 
@@ -101,6 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     init();
     return () => { mounted = false; };
   }, [localMode]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+    });
+    return () => {
+      setUnauthorizedHandler(null);
+    };
+  }, []);
 
   const applyAuthResponse = (response: AuthPayload | { data?: AuthPayload }) => {
     const payload = getAuthPayload(response);

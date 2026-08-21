@@ -209,69 +209,70 @@ export async function executeCommand(
     if (stored.match.status !== 'active') throw conflict('A partida não está ativa.');
 
     let nextState: GameState;
+    const botTurns: string[] = [];
     try {
       nextState = applyCommand(stored.state, { type: command.type });
-      const botTurns: string[] = [];
       for (let count = 0; count < 4; count += 1) {
         const current = nextState.players[nextState.currentPlayerIndex];
         if (!current?.isBot || nextState.phase === 'gameOver') break;
         botTurns.push(current.name);
         nextState = playBotTurn(nextState);
       }
-      const versionBefore = Number(stored.match.state_version);
-      const versionAfter = versionBefore + 1;
-      const event = { type: 'GAME_COMMAND', commandType: command.type, botTurns };
-      const result = { version: versionAfter, state: nextState, event };
-
-      await client.query(
-        `INSERT INTO match_events
-          (match_id, command_id, actor_user_id, version_before, version_after,
-           event_type, payload, result)
-         VALUES ($1, $2, $3, $4, $5, 'GAME_COMMAND', $6, $7)`,
-        [matchId, command.commandId, userId, versionBefore, versionAfter,
-          { commandType: command.type, botTurns }, result],
-      );
-      await client.query(
-        `INSERT INTO match_snapshots (match_id, version, state) VALUES ($1, $2, $3)`,
-        [matchId, versionAfter, nextState],
-      );
-      await client.query(
-        `UPDATE matches SET state_version = $2, current_round = $3,
-            current_player_index = $4, status = $5,
-            finished_at = CASE WHEN $5 = 'finished' THEN now() ELSE finished_at END
-          WHERE id = $1`,
-        [matchId, versionAfter, nextState.currentRound,
-          nextState.currentPlayerIndex, nextState.phase === 'gameOver' ? 'finished' : 'active'],
-      );
-      for (const player of nextState.players) {
-        await client.query(
-          `UPDATE match_players SET score = $3 WHERE match_id = $1 AND seat = $2`,
-          [matchId, player.id, player.score],
-        );
-      }
-      if (nextState.phase === 'gameOver') {
-        for (const dbPlayer of stored.players) {
-          if (!dbPlayer.userId) continue; // assento de bot ou nunca ocupado
-          const finalPlayer = nextState.players.find(player => player.id === dbPlayer.seat);
-          if (!finalPlayer) continue;
-          const quality = waterQualityForScore(finalPlayer.score);
-          await client.query(
-            `INSERT INTO game_scores
-              (match_id, user_id, score, quality_category, quality_diagnosis, families_count, rule_version)
-             VALUES ($1, $2, $3, $4, $5, $6, '1.0.0')
-             ON CONFLICT (match_id, user_id) DO NOTHING`,
-            [matchId, dbPlayer.userId, finalPlayer.score, quality.category,
-              quality.diagnosis, finalPlayer.hand.length],
-          );
-        }
-      }
-      return result;
     } catch (error) {
       if (error instanceof Error && !(error as any).statusCode) {
         throw conflict('Comando inválido para o estado atual.');
       }
       throw error;
     }
+
+    const versionBefore = Number(stored.match.state_version);
+    const versionAfter = versionBefore + 1;
+    const event = { type: 'GAME_COMMAND', commandType: command.type, botTurns };
+    const result = { version: versionAfter, state: nextState, event };
+
+    await client.query(
+      `INSERT INTO match_events
+        (match_id, command_id, actor_user_id, version_before, version_after,
+         event_type, payload, result)
+       VALUES ($1, $2, $3, $4, $5, 'GAME_COMMAND', $6, $7)`,
+      [matchId, command.commandId, userId, versionBefore, versionAfter,
+        { commandType: command.type, botTurns }, result],
+    );
+    await client.query(
+      `INSERT INTO match_snapshots (match_id, version, state) VALUES ($1, $2, $3)`,
+      [matchId, versionAfter, nextState],
+    );
+    await client.query(
+      `UPDATE matches SET state_version = $2, current_round = $3,
+          current_player_index = $4, status = $5,
+          finished_at = CASE WHEN $5 = 'finished' THEN now() ELSE finished_at END
+        WHERE id = $1`,
+      [matchId, versionAfter, nextState.currentRound,
+        nextState.currentPlayerIndex, nextState.phase === 'gameOver' ? 'finished' : 'active'],
+    );
+    for (const player of nextState.players) {
+      await client.query(
+        `UPDATE match_players SET score = $3 WHERE match_id = $1 AND seat = $2`,
+        [matchId, player.id, player.score],
+      );
+    }
+    if (nextState.phase === 'gameOver') {
+      for (const dbPlayer of stored.players) {
+        if (!dbPlayer.userId) continue; // assento de bot ou nunca ocupado
+        const finalPlayer = nextState.players.find(player => player.id === dbPlayer.seat);
+        if (!finalPlayer) continue;
+        const quality = waterQualityForScore(finalPlayer.score);
+        await client.query(
+          `INSERT INTO game_scores
+            (match_id, user_id, score, quality_category, quality_diagnosis, families_count, rule_version)
+           VALUES ($1, $2, $3, $4, $5, $6, '1.0.0')
+           ON CONFLICT (match_id, user_id) DO NOTHING`,
+          [matchId, dbPlayer.userId, finalPlayer.score, quality.category,
+            quality.diagnosis, finalPlayer.hand.length],
+        );
+      }
+    }
+    return result;
   });
 }
 
@@ -295,20 +296,25 @@ export async function listEvents(db: Queryable, matchId: string, userId: string,
   };
 }
 
-export async function leaderboard(db: Queryable, limit: number, offset = 0) {
+export async function leaderboard(db: Queryable, limit: number, offset = 0, viewerId?: string) {
+  const viewerProjection = viewerId
+    ? ', CASE WHEN gs.user_id = $3::uuid THEN true ELSE false END AS is_current_user'
+    : '';
+  const params = viewerId ? [limit, offset, viewerId] : [limit, offset];
   const result = await db.query(
     `SELECT gs.score, gs.quality_category, gs.played_at,
-            p.public_name AS full_name
+            p.public_name AS full_name${viewerProjection}
        FROM game_scores gs
        JOIN profiles p ON p.user_id = gs.user_id
-      ORDER BY gs.score DESC, gs.played_at ASC, gs.id ASC
-      LIMIT $1 OFFSET $2`,
-    [limit, offset],
+       ORDER BY gs.score DESC, gs.played_at ASC, gs.id ASC
+       LIMIT $1 OFFSET $2`,
+    params,
   );
   return result.rows.map((row: any) => ({
     score: Number(row.score),
     quality_category: row.quality_category,
     played_at: new Date(row.played_at).toISOString(),
     full_name: row.full_name,
+    ...(viewerId ? { is_current_user: row.is_current_user === true } : {}),
   }));
 }

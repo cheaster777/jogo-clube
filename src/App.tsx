@@ -20,7 +20,7 @@ const AboutModal = lazy(() => import('./components/AboutModal'));
 
 function PhaseFallback() {
   return (
-    <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="min-h-[50vh] flex items-center justify-center" role="status" aria-label="Carregando tela">
       <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
     </div>
   );
@@ -32,6 +32,7 @@ interface Player {
   id: number;
   name: string;
   hand: FamilyCard[];
+  handCount?: number;
   score: number;
   isBot: boolean;
 }
@@ -201,6 +202,7 @@ export default function App() {
 
   // Bot Logic
   useEffect(() => {
+    if (gameMode !== 'local') return undefined;
     if (phase === 'playing' && players[currentPlayerIndex]?.isBot) {
       const timer = setTimeout(() => {
         drawAction();
@@ -213,7 +215,8 @@ export default function App() {
       }, 2500);
       return () => clearTimeout(timer);
     }
-  }, [phase, currentPlayerIndex, players, drawAction, nextTurn]);
+    return undefined;
+  }, [gameMode, phase, currentPlayerIndex, players, drawAction, nextTurn]);
   const handPlayerIndex = gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) >= 0
     ? serverMatch.state?.viewerSeat ?? -1
     : currentPlayerIndex;
@@ -227,6 +230,20 @@ export default function App() {
     setPhase(targetPhase);
   }, [phase, serverMatch]);
 
+  const handleSignOut = useCallback(async () => {
+    serverMatch.reset();
+    setPlayers([]);
+    setCurrentPlayerIndex(0);
+    setFamilyDeck([]);
+    setActionDeck([]);
+    setPhase('home');
+    setLastAction(null);
+    setActionMessage('');
+    setScoreDeltas({});
+    setLocalGame(null);
+    await signOut();
+  }, [serverMatch, signOut]);
+
   const serverMatchForBoard = useMemo(() => ({
     loading: serverMatch.loading,
     error: serverMatch.error,
@@ -238,7 +255,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4" role="status" aria-label="Carregando aplicação">
           <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-ink-muted font-mono text-sm">Carregando...</p>
         </div>
@@ -256,25 +273,25 @@ export default function App() {
     <MotionConfig reducedMotion="user">
     <div className="min-h-screen bg-bg text-ink font-sans selection:bg-accent selection:text-white">
       {/* ==================== HEADER ==================== */}
-      <header className="border-b border-border bg-surface/80 backdrop-blur-md p-4 md:p-6 flex justify-between items-center sticky top-0 z-50">
+      <header className="min-w-0 border-b border-border bg-surface/80 backdrop-blur-md p-4 md:p-6 flex justify-between items-center gap-3 sticky top-0 z-50">
         <button
           type="button"
-          className="flex items-center gap-3 text-left"
+          className="min-w-0 flex-1 flex items-center gap-3 text-left"
           onClick={() => requestReset('home')}
         >
-          <div className="relative w-24 h-16 flex items-center shrink-0">
+          <div className="relative w-16 md:w-24 h-16 flex items-center shrink-0">
             <img
               src="/assets/images/Cópia de Logo (1).png"
               alt="Logo Clube de Ciências"
-              className="absolute left-0 rounded-lg scale-[1.35] origin-left drop-shadow-md z-10"
+              className="absolute left-0 rounded-lg scale-[1.1] md:scale-[1.35] origin-left drop-shadow-md z-10"
             />
           </div>
           <div>
-            <h1 className="text-lg md:text-xl font-bold tracking-tight font-serif italic">Clube de Ciências de Bona</h1>
+            <h1 className="max-w-[150px] md:max-w-none truncate text-base md:text-xl font-bold tracking-tight font-serif italic">Clube de Ciências de Bona</h1>
             <p className="text-xs text-ink-muted font-mono uppercase tracking-widest hidden sm:block">Bioindicadores & Impacto Ambiental</p>
           </div>
         </button>
-        <div className="flex gap-2 md:gap-4 items-center">
+        <div className="shrink-0 flex gap-1.5 md:gap-4 items-center">
           <a
             href="https://clubedecienciasbona.com/"
             className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border-strong text-xs font-bold text-ink-secondary hover:bg-surface-alt hover:text-ink transition-all"
@@ -287,8 +304,9 @@ export default function App() {
           </a>
           <button
             onClick={() => setShowRules(true)}
-            className="p-3 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
+            className="min-w-[44px] min-h-[44px] p-3 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
             title="Ver Regras"
+            aria-label="Ver regras do jogo"
             id="btn-rules"
           >
             <Info size={18} />
@@ -312,8 +330,9 @@ export default function App() {
           {phase !== 'home' && (
             <button
               onClick={() => requestReset('setup')}
-              className="p-3 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
+              className="min-w-[44px] min-h-[44px] p-3 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
               title="Reiniciar"
+              aria-label="Reiniciar expedição"
               id="btn-restart"
             >
               <RotateCcw size={18} />
@@ -326,9 +345,10 @@ export default function App() {
               <div className="text-xs text-ink-muted font-mono truncate max-w-[120px]">{user?.email || 'Modo local'}</div>
             </div>
             <button
-              onClick={signOut}
-              className="p-3 hover:bg-danger-light rounded-lg transition-all text-ink-secondary hover:text-danger"
+              onClick={() => void handleSignOut()}
+              className="min-w-[44px] min-h-[44px] p-3 hover:bg-danger-light rounded-lg transition-all text-ink-secondary hover:text-danger"
               title="Sair da conta"
+              aria-label="Sair da conta"
               id="btn-logout"
             >
               <LogOut size={18} />

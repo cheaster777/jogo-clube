@@ -99,12 +99,12 @@ export default function RulesModal({ open, onClose }: RulesModalProps) {
             <div className="flex justify-between items-start mb-8 border-b border-border pb-4">
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold italic font-serif tracking-tight">Regras do Jogo</h2>
-                <p className="text-xs font-mono uppercase tracking-widest text-ink-muted mt-1">Clube de Ciências de bona — Bioindicadores</p>
+                <p className="text-xs font-mono uppercase tracking-widest text-ink-muted mt-1">Clube de Ciências de Bona — Bioindicadores</p>
               </div>
               <button
                 ref={rulesCloseButtonRef}
                 onClick={onClose}
-                className="p-2 hover:bg-surface-alt rounded-lg transition-colors"
+                className="min-w-[44px] min-h-[44px] p-2 hover:bg-surface-alt rounded-lg transition-colors"
                 aria-label="Fechar regras"
                 id="btn-close-rules"
               >
@@ -121,7 +121,7 @@ export default function RulesModal({ open, onClose }: RulesModalProps) {
               <section>
                 <h3 className="label font-bold mb-3">Preparação</h3>
                 <ol className="list-decimal list-inside space-y-2">
-                  <li>Embaralhe bem todas as cartas de organismos e as cartas de ação juntas.</li>
+                  <li>Embaralhe separadamente o baralho de organismos e o baralho de ações.</li>
                   <li>Distribua <strong>7 cartas aleatórias</strong> para cada jogador.</li>
                   <li>O restante das cartas forma o <strong>monte</strong>.</li>
                 </ol>
@@ -139,8 +139,8 @@ export default function RulesModal({ open, onClose }: RulesModalProps) {
 
               <section>
                 <h3 className="label font-bold mb-3">Qualidade da Água (BMWP)</h3>
-                <div className="card overflow-hidden">
-                  <table className="w-full text-xs text-left">
+                <div className="card overflow-x-auto">
+                  <table className="w-full min-w-[360px] text-xs text-left">
                     <thead>
                       <tr className="border-b border-border bg-surface-alt">
                         <th className="px-3 py-2 font-bold uppercase">Classe</th>
@@ -156,8 +156,8 @@ export default function RulesModal({ open, onClose }: RulesModalProps) {
                           <td className="px-3 py-2 font-bold">{q.range}</td>
                           <td className="px-3 py-2">
                             <span
-                              className="px-1.5 py-0.5 rounded-md text-white font-bold"
-                              style={{ backgroundColor: q.color }}
+                              className="px-1.5 py-0.5 rounded-md font-bold"
+                              style={{ backgroundColor: q.color, color: shouldUseDarkText(q.color) ? '#1C1917' : '#FFFFFF' }}
                             >
                               {q.category}
                             </span>

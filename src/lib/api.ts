@@ -34,6 +34,7 @@ export interface LeaderboardEntry {
   quality_category: string;
   played_at: string;
   full_name: string;
+  is_current_user?: boolean;
 }
 
 export interface MatchCommand {
@@ -64,8 +65,16 @@ export class ApiError extends Error {
   }
 }
 
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-export const isApiConfigured = Boolean(configuredBaseUrl);
+// In production the web app and API are same-origin by default (/api/v1).
+// Development keeps the explicit local-mode fallback when no API is configured.
+export const isApiConfigured = Boolean(configuredBaseUrl || import.meta.env.PROD);
 export const API_BASE_URL = (configuredBaseUrl || '/api/v1').replace(/\/+$/, '');
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
@@ -130,6 +139,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       const nestedError = errorPayload?.error && typeof errorPayload.error === 'object'
         ? errorPayload.error as Record<string, unknown>
         : undefined;
+      if (response.status === 401) unauthorizedHandler?.();
       throw new ApiError(
         getErrorMessage(payload, fallback),
         response.status,

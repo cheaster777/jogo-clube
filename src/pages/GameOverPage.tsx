@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { Trophy } from 'lucide-react';
 import type { FamilyCard } from '../constants';
-import { getWaterQuality } from '../lib/cardDisplay';
+import { getWaterQuality, shouldUseDarkText } from '../lib/cardDisplay';
 
 // Mirrors the `Player` shape defined in App.tsx. Kept as a local copy (rather
 // than a shared src/types/game.ts) so this file types cleanly on its own
@@ -10,6 +10,7 @@ export interface Player {
   id: number;
   name: string;
   hand: FamilyCard[];
+  handCount?: number;
   score: number;
   isBot: boolean;
 }
@@ -65,15 +66,15 @@ export default function GameOverPage({
                 <span className="font-mono text-2xl text-ink-muted">#{String(idx + 1).padStart(2, '0')}</span>
                 <div className="text-left">
                   <div className="font-bold text-lg md:text-xl italic font-serif">{p.name}</div>
-                  <div className="text-xs text-ink-muted uppercase tracking-widest">{p.hand.length} famílias identificadas</div>
+                  <div className="text-xs text-ink-muted uppercase tracking-widest">{p.handCount ?? p.hand.length} famílias identificadas</div>
                 </div>
               </div>
 
               <div className="flex flex-col items-center md:items-end gap-1.5 w-full md:w-auto">
                 <div className="text-2xl md:text-3xl font-bold font-mono">{p.score} <span className="text-xs uppercase text-ink-muted">pts</span></div>
                 <div
-                  className="px-3 py-1 text-xs font-bold uppercase tracking-widest text-white rounded-md"
-                  style={{ backgroundColor: quality.color }}
+                  className="px-3 py-1 text-xs font-bold uppercase tracking-widest rounded-md"
+                  style={{ backgroundColor: quality.color, color: shouldUseDarkText(quality.color) ? '#1C1917' : '#FFFFFF' }}
                 >
                   {quality.category}: {quality.diagnosis}
                 </div>

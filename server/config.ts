@@ -3,6 +3,10 @@ export interface AppConfig {
   port: number;
   databaseUrl: string;
   databaseSsl: boolean;
+  databaseSslRejectUnauthorized: boolean;
+  databaseSslCa: string;
+  databaseStatementTimeoutMs: number;
+  databaseIdleInTransactionTimeoutMs: number;
   corsOrigins: string[];
   secureCookies: boolean;
   sessionCookieName: string;
@@ -43,6 +47,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: numberEnv(env.PORT, 4000),
     databaseUrl: env.DATABASE_URL ?? '',
     databaseSsl: env.DATABASE_SSL === 'true',
+    databaseSslRejectUnauthorized: env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
+    databaseSslCa: env.DATABASE_SSL_CA ?? '',
+    databaseStatementTimeoutMs: numberEnv(env.DATABASE_STATEMENT_TIMEOUT_MS, 15_000),
+    databaseIdleInTransactionTimeoutMs: numberEnv(env.DATABASE_IDLE_IN_TRANSACTION_TIMEOUT_MS, 10_000),
     corsOrigins: origins,
     secureCookies,
     sessionCookieName: env.SESSION_COOKIE_NAME ?? (secureCookies ? '__Host-session' : 'session'),

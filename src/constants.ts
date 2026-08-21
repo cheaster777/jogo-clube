@@ -31,8 +31,8 @@ export const FAMILY_CARDS_DATA: Omit<FamilyCard, 'id'>[] = [
   { type: 'family', name: 'Leuctridae', score: 10, group: 'Insecta - Plecoptera', description: 'Habitam riachos e rios frios e de fluxo rápido, com um ambiente limpo e rico em oxigênio. Se alimentam de matéria orgânica em decomposição e algas.', color: '#3b82f6', image: 'assets/images/6.png' },
   { type: 'family', name: 'Molannidae', score: 10, group: 'Insecta - Trichoptera', description: 'Vivem em corpos como riachos, rios, lagos e lagoas, geralmente em locais com areia ou silte, onde a correnteza é reduzida. As larvas constroem casulos de areia ou outros materiais.', color: '#3b82f6', image: 'assets/images/7.png' },
   { type: 'family', name: 'Capniidae', score: 10, group: 'Insecta - Plecoptera', description: 'Vivem principalmente em águas frias e bem oxigenadas, como riachos, rios e lagos. As ninfas alimentam-se de material orgânico particulado, algas, detritos, e, em algumas espécies, de outros insetos.', color: '#3b82f6', image: 'assets/images/8.png' },
-  { type: 'family', name: 'Goeridae', score: 10, group: 'Insecta - Trichoptera', description: 'Suas larvas são aquáticas e frequentemente constroem casúlos protetores com diversos materiais, como pequenas pedras ou fragmentos de plantas. Vivem principalmente em riachos, rios, lagos e outras áreas de água doce.', color: '#3b82f6', image: 'assets/images/9.png' },
-  { type: 'family', name: 'Leptoceridae', score: 10, group: 'Insecta - Trichoptera', description: 'São encontrados em diversos habitats de água doce ao redor do mundo, especialmente em regiões tropicais e subtropicais. Suas larvas constroem casúlos, geralmente de materiais orgânicos.', color: '#3b82f6', image: 'assets/images/10.png' },
+  { type: 'family', name: 'Goeridae', score: 10, group: 'Insecta - Trichoptera', description: 'Suas larvas são aquáticas e frequentemente constroem casulos protetores com diversos materiais, como pequenas pedras ou fragmentos de plantas. Vivem principalmente em riachos, rios, lagos e outras áreas de água doce.', color: '#3b82f6', image: 'assets/images/9.png' },
+  { type: 'family', name: 'Leptoceridae', score: 10, group: 'Insecta - Trichoptera', description: 'São encontrados em diversos habitats de água doce ao redor do mundo, especialmente em regiões tropicais e subtropicais. Suas larvas constroem casulos, geralmente de materiais orgânicos.', color: '#3b82f6', image: 'assets/images/10.png' },
 
   // Score 8 - Light Blue
   { type: 'family', name: 'Astacidae', score: 8, group: 'Malacostraca - Decapoda', description: 'Astacidae é uma família de crustáceos decápodes de água doce que agrupa lagostins originários da Europa, oeste da Ásia e da costa oeste da América do Norte', color: '#60a5fa', image: 'assets/images/11.png' },
@@ -74,7 +74,7 @@ export const FAMILY_CARDS_DATA: Omit<FamilyCard, 'id'>[] = [
   { type: 'family', name: 'Stratiomyidae', score: 4, group: 'Insecta - Diptera', description: 'A família Stratiomyidae, também conhecida como moscas-soldado, é um grupo de insetos pertencente à ordem Diptera (moscas). São conhecidos por suas diversas características morfológicas.', color: '#fb923c', image: 'assets/images/39.png' },
   { type: 'family', name: 'Limoniidae', score: 4, group: 'Insecta - Diptera', description: 'Os Limoniidae são uma grande família de moscas conhecidas como moscas-das-neves ou moscas-pernuda. São encontrados em ambientes úmidos em todo o mundo.', color: '#fb923c', image: 'assets/images/40.png' },
   { type: 'family', name: 'Anthomyidae', score: 4, group: 'Insecta - Diptera', description: 'Os Anthomyiidae são uma família de moscas, com mais de 2.000 espécies. Muitas se parecem com pequenas moscas-domésticas, e algumas larvas são pragas agrícolas.', color: '#fb923c', image: 'assets/images/41.png' },
-  { type: 'family', name: 'Sialidae', score: 4, group: 'Insecta - Megaloptera', description: 'Quando são larvas se alimentam de outros invertebrados aquáticos, mas em sua fase adulta se alimentam principalmente de liquidos. São escuros e de corpo compacto.', color: '#fb923c', image: 'assets/images/42.png' },
+  { type: 'family', name: 'Sialidae', score: 4, group: 'Insecta - Megaloptera', description: 'Quando são larvas se alimentam de outros invertebrados aquáticos, mas em sua fase adulta se alimentam principalmente de líquidos. São escuros e de corpo compacto.', color: '#fb923c', image: 'assets/images/42.png' },
   { type: 'family', name: 'Psychodidae', score: 4, group: 'Insecta - Diptera', description: 'Os Psychodidae, conhecidos como moscas-de-banheiro ou mosquitos-de-esgoto, são pequenas moscas peludas. Suas larvas vivem em ambientes ricos em matéria orgânica.', color: '#fb923c', image: 'assets/images/43.png' },
   { type: 'family', name: 'Baetidae', score: 4, group: 'Insecta - Ephemeroptera', description: 'As ninfas são conhecidas por se alimentarem de diversos materiais orgânicos e os adultos não se alimentam. São amplamente distribuídos em diversos ambientes aquáticos.', color: '#fb923c', image: 'assets/images/44.png' },
   { type: 'family', name: 'Dixidae', score: 4, group: 'Insecta - Diptera', description: 'São pequenos mosquitos com pernas finas. As larvas podem ser encontradas em ambientes aquáticos, como em cachoeiras e locais com água parada, onde filtram partículas orgânicas.', color: '#fb923c', image: 'assets/images/45.png' },
@@ -83,7 +83,7 @@ export const FAMILY_CARDS_DATA: Omit<FamilyCard, 'id'>[] = [
   { type: 'family', name: 'Nepidae', score: 3, group: 'Insecta - Hemiptera', description: 'Vivem em ambientes lênticos. São conhecidos como "escorpiões d\'água". São carnívoros, comem aranhas, vermes, pequenos peixes entre outros pequenos animais aquáticos.', color: '#f97316', image: 'assets/images/46.png' },
   { type: 'family', name: 'Notonectidae', score: 3, group: 'Insecta - Hemiptera', description: 'A família Notonectidae, também conhecida como barqueiros, é um grupo de insetos aquáticos que nadam de costas, com o abdômen voltado para cima.', color: '#f97316', image: 'assets/images/47.png' },
   { type: 'family', name: 'Hydrometridae', score: 3, group: 'Insecta - Hemiptera', description: 'As Hydrometridae são percevejos aquáticos longos e finos, que caminham sobre a água. São predadoras de pequenos invertebrados e vivem em ambientes calmos.', color: '#f97316', image: 'assets/images/48.png' },
-  { type: 'family', name: 'Veliidae', score: 3, group: 'Insecta - Hemiptera', description: 'É uma família de insetos aquáticos conhecidos como "patinhade-água". São predadores que utilizam suas patas dianteiras para detectar vibrações na água.', color: '#f97316', image: 'assets/images/49.png' },
+  { type: 'family', name: 'Veliidae', score: 3, group: 'Insecta - Hemiptera', description: 'É uma família de insetos aquáticos conhecidos como "patinho-d\'água". São predadores que utilizam suas patas dianteiras para detectar vibrações na água.', color: '#f97316', image: 'assets/images/49.png' },
   { type: 'family', name: 'Mesoveliidae', score: 3, group: 'Insecta - Hemiptera', description: 'As Mesoveliidae são pequenos percevejos semi-aquáticos. Eles caminham na água, são predadores ou necrófagos de invertebrados, e podem ter asas ou não.', color: '#f97316', image: 'assets/images/50.png' },
   { type: 'family', name: 'Gyrinidae', score: 3, group: 'Insecta - Coleoptera', description: 'Conhecidos como "besouros-giratórios", habitam principalmente ambientes de água doce, como lagos, lagoas, rios e riachos. Preferem águas paradas ou de fluxo lento.', color: '#f97316', image: 'assets/images/51.png' },
   { type: 'family', name: 'Gerridae', score: 3, group: 'Insecta - Hemiptera', description: 'Conhecidas como patinadores-de-água ou aranhas-d\'água, são insetos predadores que se alimentam principalmente de outros insetos que caem na água.', color: '#f97316', image: 'assets/images/52.png' },
@@ -111,14 +111,14 @@ export const ACTION_CARDS_DATA: Omit<ActionCard, 'id' | 'effect'>[] = [
     type: 'action',
     title: 'Drift — arrasto',
     category: 'impact',
-    description: 'O forte regime de chuvas “arrastou” alguns organismos do seu corpo aquático. O seu colega anterior deverá eliminar aleatoriamente 5 cartas do seu monte',
+    description: 'O forte regime de chuvas “arrastou” alguns organismos do corpo aquático do seu colega anterior. Ele perde aleatoriamente 5 cartas do próprio monte',
     image: 'assets/images/60.png'
   },
   {
     type: 'action',
     title: 'Peixe exótico',
     category: 'impact',
-    description: 'Uma espécie de peixe exótico e predador voraz é liberado no seu corpo aquático e se reproduz, consumindo grande quantidade de macroinvertebrados. Seu proximo colega deverá eliminar 5 cartas suas aleatoriamente.',
+    description: 'Uma espécie de peixe exótico e predador voraz é liberado no corpo aquático do seu próximo colega e se reproduz, consumindo grande quantidade de macroinvertebrados. Ele perde aleatoriamente 5 cartas do próprio monte.',
     image: 'assets/images/61.png'
   },
   {
