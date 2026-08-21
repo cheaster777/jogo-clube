@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, User, ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, ArrowLeft, Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'verify' | 'reset';
@@ -10,12 +10,15 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [needsVerification, setNeedsVerification] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -33,11 +36,14 @@ export default function AuthScreen() {
   const resetForm = () => {
     setEmail('');
     setPassword('');
+    setConfirmPassword('');
     setFullName('');
     setToken('');
     setError(null);
     setSuccess(null);
     setNeedsVerification(false);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const switchMode = (newMode: AuthMode) => {
@@ -75,6 +81,12 @@ export default function AuthScreen() {
 
     if (password.length < 8) {
       setError('A senha deve ter pelo menos 8 caracteres.');
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('As senhas não coincidem.');
       setLoading(false);
       return;
     }
@@ -118,6 +130,11 @@ export default function AuthScreen() {
     setError(null);
     if (password.length < 8) {
       setError('A senha deve ter pelo menos 8 caracteres.');
+      setLoading(false);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('As senhas não coincidem.');
       setLoading(false);
       return;
     }
@@ -234,15 +251,24 @@ export default function AuthScreen() {
                     <div className="relative">
                       <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="input-field pl-10"
+                        className="input-field pl-10 pr-10"
                         placeholder="••••••••"
                         required
                         autoComplete="current-password"
                         id="login-password"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
 
@@ -328,16 +354,51 @@ export default function AuthScreen() {
                     <div className="relative">
                       <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="input-field pl-10"
+                        className="input-field pl-10 pr-10"
                         placeholder="Mínimo 8 caracteres"
                         required
                         minLength={8}
                         autoComplete="new-password"
                         id="signup-password"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="signup-confirm-password" className="label block mb-1.5">Confirmar Senha</label>
+                    <div className="relative">
+                      <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="input-field pl-10 pr-10"
+                        placeholder="Repita a senha"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        id="signup-confirm-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
 
@@ -383,7 +444,33 @@ export default function AuthScreen() {
                   </div>
                   <div>
                     <label htmlFor="new-password" className="label block mb-1.5">Nova senha</label>
-                    <input id="new-password" type="password" value={password} onChange={event => setPassword(event.target.value)} className="input-field" minLength={8} autoComplete="new-password" required />
+                    <div className="relative">
+                      <input id="new-password" type={showPassword ? 'text' : 'password'} value={password} onChange={event => setPassword(event.target.value)} className="input-field pr-10" minLength={8} autoComplete="new-password" required />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="new-password-confirm" className="label block mb-1.5">Confirmar nova senha</label>
+                    <div className="relative">
+                      <input id="new-password-confirm" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} className="input-field pr-10" minLength={8} autoComplete="new-password" required />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                   <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
                     {loading ? <Loader2 size={18} className="animate-spin" /> : 'Atualizar senha'}

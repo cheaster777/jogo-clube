@@ -21,7 +21,7 @@ async function send(config: AppConfig, to: string, subject: string, text: string
   const mailer = getTransporter(config);
   if (!mailer) {
     if (config.nodeEnv === 'production') throw new Error('SMTP não configurado para envio de email.');
-    console.info(JSON.stringify({ level: 'info', message: 'Email de desenvolvimento não enviado', subject }));
+    console.info(JSON.stringify({ level: 'info', message: 'Email de desenvolvimento não enviado', subject, to, text }));
     return;
   }
   await mailer.sendMail({ from: config.emailFrom, to, subject, text, html });
