@@ -74,6 +74,7 @@ services:
       - "3001"
     networks:
       - app
+      - egress
     depends_on:
       db:
         condition: service_healthy
@@ -132,6 +133,8 @@ networks:
   app:
     driver: bridge
     internal: true
+  egress:
+    driver: bridge
 
 volumes:
   caddy_data:
