@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense, lazy } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'motion/react';
-import { Info, RotateCcw, ArrowLeft, LogOut, Droplets, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Info, RotateCcw, ArrowLeft, LogOut, Droplets, AlertTriangle, ShieldCheck, Heart } from 'lucide-react';
 import type { ActionCard, FamilyCard } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
@@ -16,6 +16,7 @@ const GameBoard = lazy(() => import('./components/GameBoard'));
 const GameOverPage = lazy(() => import('./pages/GameOverPage'));
 const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
 const RulesModal = lazy(() => import('./components/RulesModal'));
+const AboutModal = lazy(() => import('./components/AboutModal'));
 
 function PhaseFallback() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
   });
 
   const [showRules, setShowRules] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   // Deltas de pontuação (id do jogador -> variação) causados pela última carta
   // de ação puxada, para deixar visível quando o efeito atinge outro jogador.
   const [scoreDeltas, setScoreDeltas] = useState<Record<string, number>>({});
@@ -409,6 +411,22 @@ export default function App() {
       <Suspense fallback={null}>
         <RulesModal open={showRules} onClose={() => setShowRules(false)} />
       </Suspense>
+
+      {/* ==================== ABOUT MODAL + FAB ==================== */}
+      <Suspense fallback={null}>
+        <AboutModal open={showAbout} onClose={() => setShowAbout(false)} />
+      </Suspense>
+      <motion.button
+        onClick={() => setShowAbout(true)}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-accent text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all"
+        title="Quem Somos Nós"
+        aria-label="Quem Somos Nós"
+        id="btn-about-fab"
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <Heart size={24} />
+      </motion.button>
 
       {/* ==================== GLOBAL FOOTER ==================== */}
       <footer className="mt-16 md:mt-20 border-t border-border p-8 md:p-12 bg-surface/50">
