@@ -7,6 +7,7 @@ export interface GameBoardPlayer {
   id: number;
   name: string;
   hand: FamilyCard[];
+  handCount?: number;
   score: number;
   isBot: boolean;
 }
@@ -88,7 +89,7 @@ export default function GameBoard({
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs font-mono text-ink-muted">
-              <Layers size={12} /> {p.hand.length} cartas em mãos
+              <Layers size={12} /> {gameMode === 'server' ? (p.handCount ?? p.hand.length) : p.hand.length} cartas em mãos
             </div>
           </div>
         ))}
@@ -105,7 +106,7 @@ export default function GameBoard({
               <div className="inline-block p-4 rounded-2xl bg-accent-light/50 mb-4">
                 <Zap size={48} className="text-accent animate-pulse" />
               </div>
-              <h2 className="text-2xl md:text-3xl font-bold italic font-serif">Vez de {players[currentPlayerIndex].name}</h2>
+              <h2 className="text-2xl md:text-3xl font-bold italic font-serif" aria-live="polite">Vez de {players[currentPlayerIndex]?.name ?? 'aguarde'}</h2>
               <p className="max-w-md mx-auto text-ink-secondary leading-relaxed">
                 O ambiente está em constante mudança. Você deve enfrentar as consequências das ações humanas ou colher os frutos da preservação.
               </p>
@@ -168,7 +169,7 @@ export default function GameBoard({
 
                   <div className="p-4 bg-surface-alt rounded-lg border border-border mb-6">
                     <div className="label mb-2">Resultado na Mesa</div>
-                    <div className="font-bold text-sm tracking-tight">{actionMessage}</div>
+                    <div className="font-bold text-sm tracking-tight" aria-live="polite">{actionMessage}</div>
                     {gameMode === 'local' && Object.keys(scoreDeltas).length > 0 && (
                       <ul className="mt-3 pt-3 border-t border-border space-y-1">
                         {Object.entries(scoreDeltas).map(([playerId, delta]: [string, number]) => {

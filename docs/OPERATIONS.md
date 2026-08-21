@@ -5,7 +5,7 @@ Este documento descreve o mínimo necessário para executar o Clube de Ciências
 ## Primeiro deploy
 
 1. Instale Docker Engine e Compose, configure o firewall para permitir apenas SSH restrito, HTTP e HTTPS.
-2. Crie `.env.production` fora do Git com `SITE_ADDRESS`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `CORS_ORIGIN`, `APP_BASE_URL`, `TRUST_PROXY=true`, `EMAIL_MODE=smtp`, `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER` e `SMTP_PASSWORD`.
+2. Crie `.env.production` fora do Git com `SITE_ADDRESS`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `CORS_ORIGIN`, `APP_BASE_URL`, `TRUST_PROXY=true`, `EMAIL_MODE=smtp`, `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER` e `SMTP_PASSWORD`. Para Resend via SMTP, use `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`, `SMTP_USER=resend` e a API key `re_...` em `SMTP_PASSWORD`.
 3. Valide o domínio antes de habilitar HSTS e confirme que o SMTP consegue entregar mensagens.
 4. Execute as migrações com o job/runner de banco aprovado e verifique `GET /health/ready`.
 5. Suba o stack: `docker compose --env-file .env.production --profile backend up -d --build`.

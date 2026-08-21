@@ -31,14 +31,14 @@
   --color-ink: #1C1917;
   --color-ink-secondary: #57534E;
   --color-ink-muted: #78716C;
-  --color-accent: #0D9488;
-  --color-accent-hover: #0F766E;
+  --color-accent: #0F766E;
+  --color-accent-hover: #115E59;
   --color-accent-light: #CCFBF1;
   --color-danger: #DC2626;
   --color-danger-light: #FEF2F2;
-  --color-success: #059669;
+  --color-success: #047857;
   --color-success-light: #ECFDF5;
-  --color-warning: #D97706;
+  --color-warning: #B45309;
   --color-warning-light: #FFFBEB;
   --color-border: rgba(28, 25, 23, 0.08);
   --color-border-strong: rgba(28, 25, 23, 0.16);
@@ -108,6 +108,7 @@
     line-height: 1.6;
     color: var(--color-ink);
     background-color: var(--color-bg);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   /* --- Headings: serif for display --- */
@@ -131,6 +132,11 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
+    }
+    /* Preserve the meaning of loading indicators while reducing decoration. */
+    .animate-spin {
+      animation-duration: 1.2s !important;
+      animation-iteration-count: infinite !important;
     }
   }
 

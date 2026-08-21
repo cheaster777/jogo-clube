@@ -92,7 +92,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
           <div className="aspect-square bg-surface rounded-2xl p-4 rotate-2 shadow-lg overflow-hidden border border-border">
             <img
               src="/assets/images/WhatsApp Image 2026-04-15 at 12.10.36.jpeg"
-              alt="Logo Clube de Ciências de Bona"
+              alt="Paisagem de um riacho cercado por vegetação"
               className="w-full h-full object-cover rounded-xl"
               referrerPolicy="no-referrer"
             />

@@ -15,7 +15,13 @@ function parseCookies(header: string | undefined): Record<string, string> {
     if (index < 0) return [];
     const key = part.slice(0, index).trim();
     const value = part.slice(index + 1).trim();
-    return key ? [[key, decodeURIComponent(value)] as const] : [];
+    if (!key) return [];
+    try {
+      return [[key, decodeURIComponent(value)] as const];
+    } catch {
+      // Ignore malformed cookies instead of turning a bad client header into 500.
+      return [];
+    }
   }));
 }
 

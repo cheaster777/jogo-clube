@@ -28,11 +28,11 @@ async function send(config: AppConfig, to: string, subject: string, text: string
 }
 
 export function verificationUrl(config: AppConfig, token: string): string {
-  return `${config.appBaseUrl}/?verify=${encodeURIComponent(token)}`;
+  return `${config.appBaseUrl}/#verify=${encodeURIComponent(token)}`;
 }
 
 export function resetUrl(config: AppConfig, token: string): string {
-  return `${config.appBaseUrl}/?reset=${encodeURIComponent(token)}`;
+  return `${config.appBaseUrl}/#reset=${encodeURIComponent(token)}`;
 }
 
 export async function sendVerificationEmail(config: AppConfig, to: string, token: string): Promise<void> {

@@ -95,7 +95,7 @@ export async function consumeEmailVerification(db: Queryable, tokenHash: string)
     UPDATE users u
        SET status = 'active', email_verified_at = now(), updated_at = now()
       FROM consumed
-     WHERE u.id = consumed.user_id
+     WHERE u.id = consumed.user_id AND u.status = 'pending'
      RETURNING u.id, u.email, u.password_hash, u.status`,
     [tokenHash],
   );

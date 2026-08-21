@@ -19,7 +19,8 @@ export function createRateLimiter(config: AppConfig, max = config.rateLimitMax):
   return (req, _res, next) => {
     const now = Date.now();
     sweepExpired(now);
-    const key = `${req.ip ?? req.socket.remoteAddress ?? 'unknown'}:${req.baseUrl}${req.path}`;
+    const endpoint = typeof req.route?.path === 'string' ? req.route.path : req.path;
+    const key = `${req.ip ?? req.socket.remoteAddress ?? 'unknown'}:${req.method}:${req.baseUrl}${endpoint}`;
     const current = buckets.get(key);
     if (!current || current.resetAt <= now) {
       buckets.set(key, { count: 1, resetAt: now + config.rateLimitWindowMs });

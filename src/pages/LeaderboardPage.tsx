@@ -1,9 +1,7 @@
 import { motion } from 'motion/react';
 import { Trophy, RotateCcw, ArrowLeft, AlertTriangle, Play, Medal } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
 import { useLeaderboard } from '../hooks/useLeaderboard';
-import { getWaterQuality } from '../lib/cardDisplay';
-import type { LeaderboardEntry } from '../lib/api';
+import { getWaterQuality, shouldUseDarkText } from '../lib/cardDisplay';
 
 interface LeaderboardPageProps {
   /** Navigate back to the home screen (header back arrow). */
@@ -12,13 +10,7 @@ interface LeaderboardPageProps {
   onPlay: () => void;
 }
 
-// The API-side LeaderboardEntry type doesn't (yet) declare `user_id`, but the
-// leaderboard payload does include it so we can highlight the viewer's own
-// position. Widen locally instead of touching the shared api.ts contract.
-type LeaderboardEntryWithUser = LeaderboardEntry & { user_id?: string };
-
 export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps) {
-  const { user } = useAuth();
   const {
     leaderboardData,
     leaderboardLoading,
@@ -48,14 +40,16 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
           <button
             onClick={fetchLeaderboard}
             disabled={leaderboardLoading}
-            className="p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink disabled:opacity-40"
+            className="min-w-[44px] min-h-[44px] p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink disabled:opacity-40"
             title="Atualizar ranking"
+            aria-label="Atualizar ranking"
           >
             <RotateCcw size={18} className={leaderboardLoading ? 'animate-spin' : ''} />
           </button>
           <button
             onClick={onBack}
-            className="p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
+            className="min-w-[44px] min-h-[44px] p-2.5 hover:bg-surface-alt rounded-lg transition-all text-ink-secondary hover:text-ink"
+            aria-label="Voltar para o início"
           >
             <ArrowLeft size={18} />
           </button>
@@ -98,8 +92,8 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
       ) : (() => {
         // Find the user's best position in the ranking
         const userEntries = leaderboardData
-          .map((e, i) => ({ entry: e as LeaderboardEntryWithUser, idx: i }))
-          .filter(({ entry }) => entry.user_id === user?.id);
+          .map((entry, idx) => ({ entry, idx }))
+          .filter(({ entry }) => entry.is_current_user === true);
         const userBestPosition = userEntries.length > 0 ? userEntries[0].idx + 1 : null;
 
         return (
@@ -178,8 +172,8 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
                           <td className="px-4 py-3 font-mono font-bold">{entry.score}</td>
                           <td className="px-4 py-3">
                             <span
-                              className="px-2 py-0.5 rounded-md text-white font-bold text-xs"
-                              style={{ backgroundColor: quality.color }}
+                              className="px-2 py-0.5 rounded-md font-bold text-xs"
+                              style={{ backgroundColor: quality.color, color: shouldUseDarkText(quality.color) ? '#1C1917' : '#FFFFFF' }}
                             >
                               {quality.category}
                             </span>

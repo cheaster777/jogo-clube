@@ -360,8 +360,10 @@ function mapScores(rows, sourceName) {
     };
   });
   ensureUnique(scores.map((score) => score.id), `${sourceName}: id duplicado`);
-  const explicitMatchIds = scores.filter((score) => score.matchId).map((score) => score.matchId);
-  ensureUnique(explicitMatchIds, `${sourceName}: match_id duplicado (o alvo permite um score por partida)`);
+  ensureUnique(
+    scores.filter((score) => score.matchId).map((score) => `${score.matchId}:${score.userId}`),
+    `${sourceName}: combinação match_id,user_id duplicada`,
+  );
   return scores;
 }
 
@@ -407,7 +409,10 @@ function prepareDataset(raw, legacyScoreMode) {
     matchId: score.matchId || uuidV5(UUID_NAMESPACE_DNS, `jogo-clube:legacy-score:${score.id}`),
     syntheticMatch: !score.matchId,
   }));
-  ensureUnique(scores.map((score) => score.matchId), 'game_scores: match_id duplicado após normalização.');
+  ensureUnique(
+    scores.map((score) => `${score.matchId}:${score.userId}`),
+    'game_scores: combinação match_id,user_id duplicada após normalização.',
+  );
   return { profiles: raw.profiles, scores, sourceOrphans };
 }
 
@@ -473,7 +478,7 @@ async function readTarget(client, dataset) {
     client.query(`SELECT id::text, match_id::text, user_id::text, score, quality_category,
                          quality_diagnosis, families_count, rule_version, played_at
                     FROM game_scores WHERE id = ANY($1::uuid[])`, [scoreIds]),
-    client.query(`SELECT id::text, match_id::text
+    client.query(`SELECT id::text, match_id::text, user_id::text
                     FROM game_scores WHERE match_id = ANY($1::uuid[])`, [matchIds]),
     client.query(`SELECT id::text, created_by::text, mode, status, seed, rule_version,
                          created_at, updated_at, finished_at
@@ -500,12 +505,16 @@ async function readTarget(client, dataset) {
     userIds: new Set(users.rows.map((row) => String(row.id).toLowerCase())),
     profiles: new Map(profiles.rows.map((row) => [String(row.user_id).toLowerCase(), row])),
     scores: new Map(scores.rows.map((row) => [String(row.id).toLowerCase(), row])),
-    scoresByMatch: new Map(scoresByMatch.rows.map((row) => [String(row.match_id).toLowerCase(), row])),
+    scoresByMatchUser: new Map(scoresByMatch.rows.map((row) => [scoreKey(row.match_id, row.user_id), row])),
     matches: new Map(matches.rows.map((row) => [String(row.id).toLowerCase(), row])),
     syntheticParts: new Map(syntheticParts.rows.map((row) => [String(row.match_id).toLowerCase(), row])),
     orphanCounts: Object.fromEntries(Object.entries(orphanCounts.rows[0]).map(([key, value]) => [key, Number(value)])),
     top: top.rows,
   };
+}
+
+function scoreKey(matchId, userId) {
+  return `${String(matchId).toLowerCase()}:${String(userId).toLowerCase()}`;
 }
 
 function sourceTop(dataset) {
@@ -601,9 +610,9 @@ function assertApplyPreconditions(dataset, target) {
   const missingMatches = dataset.scores
     .filter((score) => !score.syntheticMatch && !target.matches.has(score.matchId))
     .map((score) => score.id);
-  const occupiedMatches = dataset.scores
-    .filter((score) => target.scoresByMatch.has(score.matchId))
-    .filter((score) => String(target.scoresByMatch.get(score.matchId).id).toLowerCase() !== score.id)
+  const occupiedScores = dataset.scores
+    .filter((score) => target.scoresByMatchUser.has(scoreKey(score.matchId, score.userId)))
+    .filter((score) => String(target.scoresByMatchUser.get(scoreKey(score.matchId, score.userId)).id).toLowerCase() !== score.id)
     .map((score) => score.id);
   const divergentProfiles = dataset.profiles
     .filter((profile) => target.profiles.has(profile.userId) && !sameProfile(profile, target.profiles.get(profile.userId)))
@@ -614,7 +623,7 @@ function assertApplyPreconditions(dataset, target) {
 
   if (missingUsers.length) errors.push(`${missingUsers.length} user(s) necessários não existem no alvo; importe identidades antes dos perfis.`);
   if (missingMatches.length) errors.push(`${missingMatches.length} match(es) referenciados não existem no alvo.`);
-  if (occupiedMatches.length) errors.push(`${occupiedMatches.length} match_id(s) já pertencem a outro score.`);
+  if (occupiedScores.length) errors.push(`${occupiedScores.length} score(s) já pertencem à combinação match_id,user_id.`);
   if (divergentProfiles.length) errors.push(`${divergentProfiles.length} perfil(is) existente(s) divergem do export.`);
   if (divergentScores.length) errors.push(`${divergentScores.length} score(s) existente(s) divergem do export.`);
   if (errors.length) throw new ValidationError('Pré-condições do apply falharam; nada foi escrito.', errors);

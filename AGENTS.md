@@ -2,7 +2,7 @@
 
 ## Visão Geral do Projeto
 
-Jogo educacional de cartas em React 19 + Vite 6 sobre bioindicadores (macroinvertebrados) e impacto ambiental. Feito para deployment no AI Studio.
+Jogo educacional de cartas em React 19 + Vite 6 sobre bioindicadores (macroinvertebrados) e impacto ambiental. A aplicação web e a API Express/Node são empacotadas para deployment em VPS via Docker Compose.
 
 ## Comandos
 
@@ -10,20 +10,26 @@ Jogo educacional de cartas em React 19 + Vite 6 sobre bioindicadores (macroinver
 npm install          # Instalar dependências
 npm run dev         # Rodar servidor de desenvolvimento (porta 3000)
 npm run build       # Build para produção
-npm run lint         # Apenas typechecking do TypeScript
+npm run lint         # Typechecking do frontend
+npm run server:build # Typechecking da API
+npm test             # Testes unitários/contrato e importadores
+npm run test:e2e     # Smoke test Playwright
 ```
 
 ## Ambiente Necessário
 
-Criar `.env.local` com:
-- `VITE_SUPABASE_URL` - URL do projeto Supabase
-- `VITE_SUPABASE_ANON_KEY` - Chave anon do Supabase
-- `GEMINI_API_KEY` - (opcional) Chave da API Gemini
+Copiar `.env.example` para o ambiente adequado. A API usa PostgreSQL próprio e autenticação por sessão/cookie:
+- `DATABASE_URL` - conexão do PostgreSQL
+- `CORS_ORIGIN` - origens permitidas, separadas por vírgula
+- `APP_BASE_URL` - URL pública usada nos links de email
+- `EMAIL_MODE=smtp` e `SMTP_*` - envio real de confirmação/reset em produção; a VPS atual usa Resend via `smtp.resend.com`
+- `VITE_API_BASE_URL` - base da API no bundle do frontend; em produção, normalmente `/api/v1`
 
 ## Arquitetura
 
-- **Autenticação**: Supabase Auth via `src/contexts/AuthContext.tsx`
-- **Cliente Supabase**: `src/lib/supabase.ts`
+- **Autenticação**: API Express/PostgreSQL via `server/auth` e `src/lib/api.ts`
+- **API**: `server/app.ts`, `server/routes.ts` e `server/repositories/`
+- **Banco e migrações**: `database/migrations/` e `scripts/migrate.mjs`
 - **Dados do Jogo**: `src/constants.ts` (FAMILY_CARDS_DATA, ACTION_CARDS_DATA)
 - **App Principal**: `src/App.tsx`
 - **Componentes**: `src/components/AuthScreen.tsx`
@@ -33,6 +39,6 @@ Criar `.env.local` com:
 
 - Tailwind v4 usa config baseada em CSS (sem `tailwind.config.js`)
 - Autenticação obrigatória - usuários não autenticados veem tela de login
-- Jogo salva score automaticamente no Supabase ao terminar
-- Nome do Jogador 1 é preenchido automaticamente pelo `full_name` do perfil Supabase
-- Sem suite de testes - `npm run lint` faz apenas typechecking
+- Jogo local mantém o estado no navegador; jogo online usa snapshots/versionamento na API
+- O score online é salvo no PostgreSQL ao terminar
+- Confirmação de email e recuperação de senha dependem de SMTP em produção; em desenvolvimento `EMAIL_MODE=console` apenas registra o link no log

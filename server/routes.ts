@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import type { AppConfig } from './config';
 import { consumeEmailVerification, consumePasswordReset, createEmailVerification, createPasswordReset, createUser, findUserByEmail, markLogin, sessionExpiry } from './repositories/auth';
 import { createOpaqueToken, hashOpaqueToken, hashPassword, verifyPassword } from './auth/password';
-import { clearSessionCookie, createSession, setSessionCookie } from './auth/session';
+import { clearSessionCookie, createSession, loadAuthUser, setSessionCookie } from './auth/session';
 import { withTransaction } from './db';
 import { AppError, asyncHandler, badRequest, unauthorized } from './errors';
 import { sendPasswordResetEmail, sendVerificationEmail } from './email';
@@ -40,6 +40,7 @@ export function createApiRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
   const authLimit = createRateLimiter(config, config.authRateLimitMax);
   const commandLimit = createRateLimiter(config, config.commandRateLimitMax);
+  const generalLimit = createRateLimiter(config);
   const protectedRoute = requireAuth(pool, config);
 
   router.post('/auth/register', authLimit, asyncHandler(async (req, res) => {
@@ -165,13 +166,14 @@ export function createApiRouter(pool: Pool, config: AppConfig): Router {
     res.json(authResponse({ id: auth.userId, email: auth.email, publicName: auth.publicName }, expiresAt));
   }));
 
-  router.get('/leaderboard', asyncHandler(async (req, res) => {
+  router.get('/leaderboard', generalLimit, asyncHandler(async (req, res) => {
     const limit = parsePositiveLimit(req.query.limit);
     const offset = parseOffset(req.query.offset);
-    res.json(await leaderboard(pool, limit, offset));
+    const viewer = await loadAuthUser(pool, req, config).catch(() => null);
+    res.json(await leaderboard(pool, limit, offset, viewer?.user.id));
   }));
 
-  router.post('/matches', protectedRoute, asyncHandler(async (req, res) => {
+  router.post('/matches', generalLimit, protectedRoute, asyncHandler(async (req, res) => {
     const auth = authRequest(req as AuthenticatedRequest);
     const input = parseMatchCreate(bodyObject(req.body));
     const match = await createMatch(pool, {
@@ -182,7 +184,7 @@ export function createApiRouter(pool: Pool, config: AppConfig): Router {
     res.status(201).json(match);
   }));
 
-  router.post('/matches/:id/join', protectedRoute, asyncHandler(async (req, res) => {
+  router.post('/matches/:id/join', generalLimit, protectedRoute, asyncHandler(async (req, res) => {
     const auth = authRequest(req as AuthenticatedRequest);
     const body = bodyObject(req.body);
     const displayName = typeof body.displayName === 'string' && body.displayName.trim().length > 0
@@ -197,7 +199,7 @@ export function createApiRouter(pool: Pool, config: AppConfig): Router {
     });
   }));
 
-  router.get('/matches/:id', protectedRoute, asyncHandler(async (req, res) => {
+  router.get('/matches/:id', generalLimit, protectedRoute, asyncHandler(async (req, res) => {
     const auth = authRequest(req as AuthenticatedRequest);
     const stored = await getMatch(pool, req.params.id, auth.userId);
     res.json({
@@ -210,7 +212,7 @@ export function createApiRouter(pool: Pool, config: AppConfig): Router {
     });
   }));
 
-  router.get('/matches/:id/events', protectedRoute, asyncHandler(async (req, res) => {
+  router.get('/matches/:id/events', generalLimit, protectedRoute, asyncHandler(async (req, res) => {
     const auth = authRequest(req as AuthenticatedRequest);
     const afterVersion = parseAfterVersion(req.query.afterVersion);
     res.json(await listEvents(pool, req.params.id, auth.userId, afterVersion));

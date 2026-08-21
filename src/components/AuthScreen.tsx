@@ -22,14 +22,18 @@ export default function AuthScreen() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const verificationToken = params.get('verify');
-    const resetToken = params.get('reset');
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const verificationToken = params.get('verify') ?? hashParams.get('verify');
+    const resetToken = params.get('reset') ?? hashParams.get('reset');
     if (verificationToken) {
       setToken(verificationToken);
       setMode('verify');
     } else if (resetToken) {
       setToken(resetToken);
       setMode('reset');
+    }
+    if (verificationToken || resetToken) {
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
@@ -210,6 +214,8 @@ export default function AuthScreen() {
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex items-start gap-2.5 p-3 bg-danger-light border border-danger/20 rounded-lg mb-4"
+                  role="alert"
+                  aria-live="assertive"
                 >
                   <AlertCircle size={16} className="text-danger shrink-0 mt-0.5" />
                   <p className="text-sm text-danger">{error}</p>
@@ -221,6 +227,8 @@ export default function AuthScreen() {
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex items-start gap-2.5 p-3 bg-success-light border border-success/20 rounded-lg mb-4"
+                  role="status"
+                  aria-live="polite"
                 >
                   <CheckCircle size={16} className="text-success shrink-0 mt-0.5" />
                   <p className="text-sm text-success">{success}</p>
@@ -265,7 +273,6 @@ export default function AuthScreen() {
                         onClick={() => setShowPassword(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                        tabIndex={-1}
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -369,7 +376,6 @@ export default function AuthScreen() {
                         onClick={() => setShowPassword(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                        tabIndex={-1}
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -395,7 +401,6 @@ export default function AuthScreen() {
                         onClick={() => setShowConfirmPassword(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
                         aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                        tabIndex={-1}
                       >
                         {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -451,7 +456,6 @@ export default function AuthScreen() {
                         onClick={() => setShowPassword(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                        tabIndex={-1}
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -466,7 +470,6 @@ export default function AuthScreen() {
                         onClick={() => setShowConfirmPassword(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
                         aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                        tabIndex={-1}
                       >
                         {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>

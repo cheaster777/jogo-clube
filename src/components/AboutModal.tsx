@@ -99,7 +99,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
               <button
                 ref={aboutCloseButtonRef}
                 onClick={onClose}
-                className="p-2 hover:bg-surface-alt rounded-lg transition-colors"
+                className="min-w-[44px] min-h-[44px] p-2 hover:bg-surface-alt rounded-lg transition-colors"
                 aria-label="Fechar"
                 id="btn-close-about"
               >

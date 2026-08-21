@@ -6,9 +6,9 @@ Objetivo operacional: manter um backup diário criptografado, com checksum, rete
 
 Em VPS, instale `age`, configure `/etc/jogo-clube/backup.env` fora do Git e habilite
 `ops/jogo-clube-backup.timer` com `systemctl enable --now jogo-clube-backup.timer`.
-O serviço chama `scripts/backup-postgres.sh` diariamente e grava o checksum ao lado do arquivo.
+O serviço chama `scripts/backup-postgres.sh` diariamente e grava o checksum ao lado do arquivo. Na VPS atual, o unit usa o usuário `clubeciencia` e `WorkingDirectory=/srv/clubeciencia`; se o projeto for instalado em outro caminho, ajuste `WorkingDirectory` e `ExecStart` juntos.
 
-Defina `POSTGRES_USER`, `POSTGRES_DB` e `BACKUP_AGE_RECIPIENT` no ambiente seguro do operador. O recipiente age é público; a chave privada fica fora da VPS e com acesso restrito.
+Defina `COMPOSE_ENV_FILE`, `POSTGRES_USER`, `POSTGRES_DB`, `BACKUP_DIR` e `BACKUP_AGE_RECIPIENT` no ambiente seguro do operador. O usuário do serviço precisa executar Docker Compose (normalmente por acesso controlado ao socket Docker). O recipiente age é público; a chave privada fica fora da VPS e com acesso restrito.
 
 ```bash
 set -euo pipefail

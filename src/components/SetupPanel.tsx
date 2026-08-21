@@ -55,12 +55,13 @@ export default function SetupPanel({
         </div>
 
         <div className="space-y-6">
-          <div>
-            <label className="label block mb-3">Modo da partida</label>
+          <fieldset>
+            <legend className="label block mb-3">Modo da partida</legend>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => onGameModeChange('local')}
+                aria-pressed={gameMode === 'local'}
                 className={`py-3 rounded-lg font-mono text-xs font-semibold uppercase transition-all border ${
                   gameMode === 'local' ? 'bg-ink text-white border-ink shadow-sm' : 'border-border-strong hover:bg-surface-alt text-ink-secondary'
                 }`}
@@ -71,6 +72,7 @@ export default function SetupPanel({
                 type="button"
                 onClick={() => onGameModeChange('server')}
                 disabled={!apiConfigured}
+                aria-pressed={gameMode === 'server'}
                 className={`py-3 rounded-lg font-mono text-xs font-semibold uppercase transition-all border disabled:cursor-not-allowed disabled:opacity-40 ${
                   gameMode === 'server' ? 'bg-accent text-white border-accent shadow-sm' : 'border-border-strong hover:bg-surface-alt text-ink-secondary'
                 }`}
@@ -79,15 +81,17 @@ export default function SetupPanel({
               </button>
             </div>
             {!apiConfigured && <p className="text-xs text-ink-muted mt-2">Partidas com ranking oficial estarão disponíveis em breve.</p>}
-          </div>
+          </fieldset>
 
-          <div>
-            <label className="label block mb-3">Número de Jogadores</label>
+          <fieldset>
+            <legend className="label block mb-3">Número de jogadores</legend>
             <div className="grid grid-cols-3 gap-2">
               {[2, 3, 4].map(count => (
                 <button
                   key={count}
+                  type="button"
                   onClick={() => onPlayerCountChange(count)}
+                  aria-pressed={playerCount === count}
                   className={`py-3 rounded-lg font-mono font-semibold transition-all border ${
                     playerCount === count ? 'bg-ink text-white border-ink shadow-sm' : 'border-border-strong hover:bg-surface-alt text-ink-secondary'
                   }`}
@@ -97,10 +101,10 @@ export default function SetupPanel({
                 </button>
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          <div>
-            <label className="label block mb-3">Configurar Jogadores</label>
+          <fieldset>
+            <legend className="label block mb-3">Configurar jogadores</legend>
             <div className="space-y-3 mb-6">
               {playerNames.map((name, index) => (
                 <div key={index} className="flex items-center gap-3">
@@ -108,6 +112,7 @@ export default function SetupPanel({
                     {index + 1}
                   </div>
                   <div className="flex-grow flex gap-2">
+                    <label htmlFor={`input-player-${index}`} className="sr-only">Nome do jogador {index + 1}</label>
                     <input
                       type="text"
                       value={name}
@@ -117,8 +122,11 @@ export default function SetupPanel({
                       id={`input-player-${index}`}
                     />
                     <button
+                      type="button"
                       onClick={() => onBotToggle(index)}
                       disabled={gameMode === 'server'}
+                      aria-pressed={botFlags[index]}
+                      aria-label={`Jogador ${index + 1}: ${botFlags[index] ? 'bot' : 'humano'}`}
                       className={`px-3 rounded-lg text-xs font-mono font-semibold uppercase tracking-tight transition-all border ${
                         gameMode === 'server'
                           ? 'bg-surface-alt text-ink-muted border-border-strong cursor-not-allowed'
@@ -132,7 +140,7 @@ export default function SetupPanel({
                 </div>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           <div className="p-4 bg-accent-light/50 border border-accent/20 rounded-lg text-sm leading-relaxed">
             <div className="flex gap-2 mb-2 font-bold text-accent uppercase tracking-tight text-xs">

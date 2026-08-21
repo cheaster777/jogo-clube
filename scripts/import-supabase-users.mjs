@@ -212,7 +212,7 @@ function sameUser(source, target) {
     && source.updatedAt === new Date(target.updated_at).toISOString();
 }
 
-function verifyTarget(users, target) {
+function verifyTarget(users, target, { requireAll = true } = {}) {
   const missing = users.filter(user => !target.byId.has(user.id)).map(user => user.id);
   const divergent = users
     .filter(user => target.byId.has(user.id) && !sameUser(user, target.byId.get(user.id)))
@@ -221,6 +221,7 @@ function verifyTarget(users, target) {
     .filter(user => target.byEmail.has(user.email) && String(target.byEmail.get(user.email).id).toLowerCase() !== user.id)
     .map(user => user.id);
   const errors = [];
+  if (requireAll && missing.length) errors.push(`${missing.length} usuário(s) do export não existem no alvo.`);
   if (divergent.length) errors.push(`${divergent.length} usuário(s) existente(s) divergem do export.`);
   if (emailConflicts.length) errors.push(`${emailConflicts.length} email(s) já pertencem a outro UUID.`);
   return {
@@ -234,7 +235,7 @@ function verifyTarget(users, target) {
 }
 
 function assertApplyPreconditions(users, target) {
-  const verification = verifyTarget(users, target);
+  const verification = verifyTarget(users, target, { requireAll: false });
   if (!verification.ok) {
     throw new ValidationError('Pré-condições do apply falharam; nada foi escrito.', verification.errors);
   }
