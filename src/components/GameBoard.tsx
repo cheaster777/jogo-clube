@@ -229,16 +229,16 @@ export default function GameBoard({
                 key={card.id}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="family-card aspect-[2/3] flex flex-col group cursor-help relative"
+                className="family-card flex flex-col group cursor-help relative min-h-[280px] sm:min-h-[300px] md:min-h-[320px]"
                 title={card.description}
               >
-                <div className="p-2.5 flex justify-between items-start border-b border-border bg-surface relative z-10 rounded-t-lg">
+                <div className="p-2 sm:p-2.5 flex justify-between items-start border-b border-border bg-surface relative z-10 rounded-t-lg">
                   <div className="min-w-0 flex-1 mr-2">
                     <div className="text-xs font-bold font-serif italic leading-tight truncate">{card.name}</div>
-                    <div className="text-xs text-ink-muted font-mono mt-0.5 truncate">{card.group.split(' - ')[1] || card.group}</div>
+                    <div className="text-[10px] sm:text-xs text-ink-muted font-mono mt-0.5 truncate">{card.group.split(' - ')[1] || card.group}</div>
                   </div>
                   <div
-                    className="score-badge w-7 h-7 text-xs"
+                    className="score-badge w-6 h-6 sm:w-7 sm:h-7 text-xs"
                     style={{ backgroundColor: card.color, color: shouldUseDarkText(card.color) ? '#1C1917' : '#ffffff' }}
                   >
                     {card.score}
@@ -247,9 +247,9 @@ export default function GameBoard({
 
                 {/* Card Image */}
                 <div
-                  className="flex-grow w-full relative border-b border-border overflow-hidden"
+                  className="h-32 sm:h-36 md:flex-grow w-full relative border-b border-border overflow-hidden flex items-center justify-center p-2.5"
                   style={{
-                    background: `radial-gradient(circle at 50% 50%, ${card.color}20 0%, #FAFAF9 70%)`
+                    background: `radial-gradient(circle at 50% 50%, ${card.color}25 0%, #FAFAF9 75%)`
                   }}
                 >
                   <img
@@ -257,26 +257,26 @@ export default function GameBoard({
                     alt={card.name}
                     loading="lazy"
                     decoding="async"
-                    className="absolute inset-0 w-full h-[120%] object-contain top-1/2 -translate-y-1/2 drop-shadow-md group-hover:drop-shadow-xl group-hover:scale-110 group-hover:-translate-y-[55%] transition-all duration-500 ease-out"
+                    className="w-full h-full max-h-full object-contain scale-125 sm:scale-115 drop-shadow-md group-hover:drop-shadow-xl group-hover:scale-135 transition-all duration-500 ease-out z-10"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[80px] font-serif italic font-bold opacity-[0.03] pointer-events-none select-none z-0" style={{ color: card.color }}>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[70px] sm:text-[80px] font-serif italic font-bold opacity-[0.04] pointer-events-none select-none z-0" style={{ color: card.color }}>
                     {card.score}
                   </div>
                 </div>
 
                 {/* Card Body */}
-                <div className="p-2.5 flex flex-col justify-between h-[72px] bg-surface z-10 relative rounded-b-lg">
+                <div className="p-2 sm:p-2.5 flex flex-col justify-between min-h-[64px] sm:h-[72px] bg-surface z-10 relative rounded-b-lg">
                   <div className="overflow-hidden">
-                    <div className="text-xs leading-tight text-ink-secondary line-clamp-2">{card.description}</div>
+                    <div className="text-[11px] sm:text-xs leading-tight text-ink-secondary line-clamp-2">{card.description}</div>
                   </div>
-                  <div className="mt-1.5 pt-1.5 border-t border-border flex justify-between items-center">
-                    <span className="text-xs font-mono text-ink-muted">Bioindicador</span>
+                  <div className="mt-1 pt-1 border-t border-border flex justify-between items-center text-[10px] sm:text-xs">
+                    <span className="font-mono text-ink-muted">Bioindicador</span>
                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
                   </div>
                 </div>
                 {/* Hover overlay */}
-                <div className="absolute inset-0 bg-ink/85 backdrop-blur-sm text-white p-3 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-center text-center pointer-events-none z-20">
+                <div className="hidden md:flex absolute inset-0 bg-ink/85 backdrop-blur-sm text-white p-3 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 flex-col justify-center text-center pointer-events-none z-20">
                   <div className="text-xs uppercase tracking-widest mb-2 text-white/60 font-mono">Descrição Científica</div>
                   <div className="text-xs leading-relaxed italic font-serif">{card.description}</div>
                 </div>
