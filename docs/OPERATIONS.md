@@ -10,6 +10,47 @@ Este documento descreve o mínimo necessário para executar o Clube de Ciências
 4. Execute as migrações com o job/runner de banco aprovado e verifique `GET /health/ready`.
 5. Suba o stack: `docker compose --env-file .env.production --profile backend up -d --build`.
 
+## Autodeploy pelo GitHub Actions
+
+Depois do primeiro deploy manual, todo push em `main` pode atualizar a VPS pelo
+job `deploy-production` de `.github/workflows/ci.yml`. O job só começa quando
+typecheck, build, Playwright, migrações, testes, backup/restore de CI, auditoria
+de runtime e builds Docker terminam com sucesso.
+
+Crie o environment `production` no GitHub e configure estes secrets:
+
+- `VPS_HOST`: IP ou hostname direto da VPS, sem passar pelo proxy Cloudflare.
+- `VPS_USER`: usuário sem privilégios que pertença ao grupo Docker; atualmente
+  `clubeciencia`.
+- `VPS_SSH_PRIVATE_KEY`: chave privada exclusiva do Actions, sem senha.
+- `VPS_KNOWN_HOSTS`: linha completa e previamente conferida do host SSH. Não use
+  `ssh-keyscan` dentro do workflow como fonte de confiança.
+
+Variáveis opcionais do environment:
+
+- `VPS_PORT` (padrão `22`).
+- `PRODUCTION_BASE_URL` (padrão `https://jogo.tonicoimbra.com`).
+
+A chave pública correspondente deve existir em
+`/home/clubeciencia/.ssh/authorized_keys`. Restrinja a chave e o firewall ao
+necessário; nunca coloque a chave privada ou o `.env.production` no repositório.
+
+O Actions envia um `git archive` do commit validado para
+`~/jogo-clube-releases/<sha>`, confere o checksum e executa
+`scripts/deploy-vps.sh`. O script:
+
+1. valida o Compose e cria um dump PostgreSQL pré-deploy em `~/backups`;
+2. preserva as imagens em execução com a tag `rollback`;
+3. constrói imagens imutáveis identificadas pelo SHA do commit;
+4. aplica migrações pelo startup da API e sobe o Compose;
+5. aguarda `/health/ready`; em falha, restaura automaticamente as imagens
+   anteriores;
+6. mantém `~/jogo-clube-current` apontando para a release saudável.
+
+O workflow não apaga releases nem backups automaticamente. Defina uma política
+de retenção somente depois de confirmar o armazenamento disponível e o backup
+externo.
+
 O cadastro exige entrega de email em produção. Nunca use `EMAIL_MODE=console` em produção; esse modo só serve para desenvolvimento, combinado com `RESET_TOKEN_EXPOSE=true` fora de produção para testes locais. O frontend compilado deve receber `VITE_API_BASE_URL=/api/v1` (o valor padrão do Docker).
 
 ## Android/Capacitor
