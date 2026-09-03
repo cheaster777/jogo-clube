@@ -5,6 +5,8 @@ import type { ActionCard, FamilyCard } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import { isApiConfigured } from './lib/api';
+import { getWaterQuality } from './lib/cardDisplay';
+import { isSupabaseMode } from './lib/supabase';
 import { createLocalGame, dispatchLocalCommand, getLocalUiState, LocalGameState } from './game/localAdapter';
 import { useServerMatch } from './hooks/useServerMatch';
 
@@ -40,7 +42,7 @@ interface Player {
 type GameMode = 'local' | 'server';
 
 export default function App() {
-  const { user, profile, loading, localMode, signOut } = useAuth();
+  const { user, profile, loading, localMode, signOut, saveGameScore, isSupabase } = useAuth();
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
@@ -56,6 +58,7 @@ export default function App() {
   const MAX_ROUNDS = 5;
   const [localGame, setLocalGame] = useState<LocalGameState | null>(null);
   const [gameMode, setGameMode] = useState<GameMode>('local');
+  const [scoreSaved, setScoreSaved] = useState(false);
   const serverMatch = useServerMatch({
     enabled: gameMode === 'server',
     phase,
@@ -125,6 +128,7 @@ export default function App() {
 
   // Initialize Game
   const initGame = async () => {
+    setScoreSaved(false);
     if (gameMode === 'server') {
       await serverMatch.start();
       return;
@@ -217,6 +221,30 @@ export default function App() {
     }
     return undefined;
   }, [gameMode, phase, currentPlayerIndex, players, drawAction, nextTurn]);
+
+  // Salvar pontuação no Supabase quando a partida terminar
+  useEffect(() => {
+    if (phase !== 'gameOver' || !user || scoreSaved || !isSupabase || !saveGameScore) return;
+
+    const humanPlayer = players.find(p => !p.isBot);
+    if (!humanPlayer) return;
+
+    const doSave = async () => {
+      const quality = getWaterQuality(humanPlayer.score);
+      await saveGameScore(
+        humanPlayer.score,
+        quality.category,
+        quality.diagnosis,
+        humanPlayer.hand?.length || 0
+      );
+      setScoreSaved(true);
+    };
+
+    doSave().catch(err => {
+      console.error('Falha ao salvar pontuação no Supabase:', err);
+    });
+  }, [phase, user, scoreSaved, players, isSupabase, saveGameScore]);
+
   const handPlayerIndex = gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) >= 0
     ? serverMatch.state?.viewerSeat ?? -1
     : currentPlayerIndex;
@@ -372,7 +400,7 @@ export default function App() {
             {phase === 'setup' && (
               <SetupPanel
                 gameMode={gameMode}
-                apiConfigured={isApiConfigured}
+                apiConfigured={isApiConfigured && !isSupabase}
                 onGameModeChange={setGameMode}
                 playerCount={numPlayers}
                 onPlayerCountChange={setNumPlayers}
