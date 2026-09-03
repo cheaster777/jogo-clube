@@ -99,7 +99,7 @@ export default function AuthScreen() {
     if (error) {
       setError(translateError(error.message));
     } else {
-      setSuccess('Conta criada! Antes de entrar, confirme seu email — enviamos um link para a sua caixa de entrada.');
+      setSuccess('Conta criada com sucesso! Entrando automaticamente...');
     }
     setLoading(false);
   };
@@ -149,13 +149,24 @@ export default function AuthScreen() {
   };
 
   const translateError = (msg: string): string => {
-    if (msg.includes('Invalid login credentials')) return 'Email ou senha incorretos.';
-    if (msg.includes('Email not confirmed')) return 'Email ainda não confirmado. Verifique sua caixa de entrada.';
-    if (msg.includes('Email ainda não confirmado')) return 'Email ainda não confirmado. Verifique sua caixa de entrada.';
-    if (msg.includes('User already registered')) return 'Este email já está cadastrado.';
-    if (msg.includes('rate limit')) return 'Muitas tentativas. Aguarde um momento.';
-    if (msg.includes('Password should be')) return 'A senha deve ter pelo menos 8 caracteres.';
-    return msg;
+    const m = msg.toLowerCase();
+    // English messages from Supabase / API
+    if (m.includes('invalid login credentials') || m.includes('invalid_credentials')) return 'Email ou senha incorretos.';
+    if (m.includes('email not confirmed')) return 'Email ainda não confirmado. Verifique sua caixa de entrada.';
+    if (m.includes('user already registered') || m.includes('already registered')) return 'Este email já está cadastrado.';
+    if (m.includes('rate limit') || m.includes('too many requests')) return 'Muitas tentativas. Aguarde um momento.';
+    if (m.includes('password should be') || m.includes('password must be')) return 'A senha deve ter pelo menos 8 caracteres.';
+    if (m.includes('user not found')) return 'Nenhuma conta encontrada com este email.';
+    if (m.includes('email already in use')) return 'Este email já está em uso.';
+    if (m.includes('network') || m.includes('fetch')) return 'Erro de conexão. Verifique sua internet.';
+    // Portuguese messages
+    if (m.includes('credenciais') || m.includes('incorretos') || m.includes('inválid')) return 'Email ou senha incorretos.';
+    if (m.includes('não foi possível') || m.includes('solicitação')) return 'Email ou senha incorretos.';
+    if (m.includes('confirmado') || m.includes('confirme')) return 'Email ainda não confirmado. Verifique sua caixa de entrada.';
+    if (m.includes('cadastrado') || m.includes('registrado')) return 'Este email já está cadastrado.';
+    if (m.includes('muitas tentativas') || m.includes('aguarde')) return 'Muitas tentativas. Aguarde um momento.';
+    // Generic fallback
+    return 'Ocorreu um erro. Verifique seus dados e tente novamente.';
   };
 
   const titles: Record<AuthMode, { title: string; subtitle: string }> = {
