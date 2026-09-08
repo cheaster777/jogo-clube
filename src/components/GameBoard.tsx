@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Layers, Zap, AlertTriangle, ShieldCheck, ChevronRight, X } from 'lucide-react';
+import { User, Layers, Zap, AlertTriangle, ShieldCheck, ChevronRight, X, Volume2, VolumeX } from 'lucide-react';
 import type { ActionCard, FamilyCard } from '../constants';
 import { shouldUseDarkText } from '../lib/cardDisplay';
+import {
+  playActionCardSound,
+  getAudioMuted,
+  toggleAudioMuted,
+  subscribeAudioState,
+  ensureAudioUnlocked,
+} from '../lib/audio';
 
 export interface GameBoardPlayer {
   id: number;
@@ -51,6 +58,17 @@ export default function GameBoard({
   onNextTurn,
 }: GameBoardProps) {
   const [selectedCard, setSelectedCard] = useState<FamilyCard | null>(null);
+  const [isMuted, setIsMuted] = useState(getAudioMuted());
+
+  useEffect(() => {
+    return subscribeAudioState((muted) => setIsMuted(muted));
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'action' && lastAction) {
+      playActionCardSound(lastAction.title);
+    }
+  }, [phase, lastAction]);
 
   return (
     <motion.div
@@ -68,7 +86,19 @@ export default function GameBoard({
             <p className="text-[11px] text-ink-muted mt-2">Compartilhe para outro jogador entrar.</p>
           </div>
         )}
-        <div className="label mb-4">Expedição Atual</div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="label">Expedição Atual</div>
+          <button
+            type="button"
+            onClick={() => toggleAudioMuted()}
+            className="p-1.5 rounded-lg border border-border hover:border-accent text-ink-secondary hover:text-ink transition-colors flex items-center gap-1.5 text-xs font-mono"
+            title={isMuted ? 'Ativar efeitos sonoros' : 'Silenciar efeitos sonoros'}
+            aria-label={isMuted ? 'Ativar efeitos sonoros' : 'Silenciar efeitos sonoros'}
+          >
+            {isMuted ? <VolumeX size={15} className="text-danger" /> : <Volume2 size={15} className="text-accent" />}
+            <span>{isMuted ? 'Mudo' : 'Som'}</span>
+          </button>
+        </div>
         {players.map((p, idx) => (
           <div
             key={p.id}
@@ -120,7 +150,10 @@ export default function GameBoard({
                 </div>
               ) : (
                 <button
-                  onClick={onDrawAction}
+                  onClick={() => {
+                    ensureAudioUnlocked();
+                    onDrawAction();
+                  }}
                   disabled={serverMatch.loading || (gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) !== currentPlayerIndex)}
                   className="btn btn-accent btn-lg shadow-md hover:shadow-lg gap-3"
                   id="btn-draw-action"
@@ -164,7 +197,18 @@ export default function GameBoard({
                 </div>
 
                 <div className="p-6 md:p-8 bg-surface z-10 relative">
-                  <h2 className="text-3xl md:text-4xl font-bold mb-3 italic font-serif tracking-tight leading-tight">{lastAction.title}</h2>
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <h2 className="text-3xl md:text-4xl font-bold italic font-serif tracking-tight leading-tight">{lastAction.title}</h2>
+                    <button
+                      type="button"
+                      onClick={() => playActionCardSound(lastAction.title)}
+                      className="p-2 rounded-full border border-border hover:border-accent hover:text-accent text-ink-secondary transition-all shrink-0 shadow-xs"
+                      title="Ouvir som característico desta carta"
+                      aria-label="Ouvir som característico desta carta"
+                    >
+                      <Volume2 size={20} />
+                    </button>
+                  </div>
                   <div className={`w-12 h-1 rounded-full mb-5 ${lastAction.category === 'impact' ? 'bg-danger' : 'bg-success'}`}></div>
                   <p className="text-ink-secondary mb-6 leading-relaxed">
                     {lastAction.description}

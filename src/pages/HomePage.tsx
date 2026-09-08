@@ -12,9 +12,11 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  Volume2,
 } from 'lucide-react';
 import { FAMILY_CARDS_DATA, ACTION_CARDS_DATA, type FamilyCard } from '../constants';
 import { shouldUseDarkText } from '../lib/cardDisplay';
+import { playActionCardSound } from '../lib/audio';
 
 // Number of family cards shown before the user opts into the full catalog.
 // Keeps the initial scroll length reasonable; the rest expand on demand.
@@ -306,7 +308,21 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
                   </div>
 
                   <div className="p-5 flex-grow bg-surface z-10 relative">
-                    <h5 className="text-xl font-bold font-serif italic mb-3 leading-tight tracking-tight">{card.title}</h5>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <h5 className="text-xl font-bold font-serif italic leading-tight tracking-tight">{card.title}</h5>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playActionCardSound(card.title);
+                        }}
+                        className="p-1.5 rounded-full border border-border hover:border-accent hover:text-accent text-ink-muted transition-colors shrink-0"
+                        title={`Ouvir efeito sonoro de ${card.title}`}
+                        aria-label={`Ouvir efeito sonoro de ${card.title}`}
+                      >
+                        <Volume2 size={16} />
+                      </button>
+                    </div>
                     <div className={`w-10 h-1 rounded-full mb-4 ${card.category === 'impact' ? 'bg-danger' : 'bg-success'}`}></div>
                     <p className="text-sm text-ink-secondary leading-relaxed">{card.description}</p>
                   </div>
