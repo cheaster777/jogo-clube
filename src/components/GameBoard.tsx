@@ -1,5 +1,6 @@
-import { motion } from 'motion/react';
-import { User, Layers, Zap, AlertTriangle, ShieldCheck, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { User, Layers, Zap, AlertTriangle, ShieldCheck, ChevronRight, X } from 'lucide-react';
 import type { ActionCard, FamilyCard } from '../constants';
 import { shouldUseDarkText } from '../lib/cardDisplay';
 
@@ -49,6 +50,8 @@ export default function GameBoard({
   onDrawAction,
   onNextTurn,
 }: GameBoardProps) {
+  const [selectedCard, setSelectedCard] = useState<FamilyCard | null>(null);
+
   return (
     <motion.div
       key="game"
@@ -229,8 +232,18 @@ export default function GameBoard({
                 key={card.id}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="family-card flex flex-col group cursor-help relative min-h-[280px] sm:min-h-[300px] md:min-h-[320px]"
-                title={card.description}
+                onClick={() => setSelectedCard(card)}
+                className="family-card flex flex-col group cursor-pointer relative min-h-[280px] sm:min-h-[300px] md:min-h-[320px]"
+                title={`${card.name} - Toque para ver a descrição científica`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedCard(card);
+                  }
+                }}
+                aria-label={`Ver detalhes e descrição científica de ${card.name}`}
               >
                 <div className="p-2 sm:p-2.5 flex justify-between items-start border-b border-border bg-surface relative z-10 rounded-t-lg">
                   <div className="min-w-0 flex-1 mr-2">
@@ -266,16 +279,20 @@ export default function GameBoard({
                 </div>
 
                 {/* Card Body */}
-                <div className="p-2 sm:p-2.5 flex flex-col justify-between min-h-[64px] sm:h-[72px] bg-surface z-10 relative rounded-b-lg">
+                <div className="p-2 sm:p-2.5 flex flex-col justify-between flex-grow min-h-[72px] sm:min-h-[78px] bg-surface z-10 relative rounded-b-lg">
                   <div className="overflow-hidden">
+                    <div className="text-[9px] uppercase tracking-wider font-mono text-ink-muted mb-0.5 sm:hidden">Descrição Científica</div>
                     <div className="text-[11px] sm:text-xs leading-tight text-ink-secondary line-clamp-2">{card.description}</div>
                   </div>
-                  <div className="mt-1 pt-1 border-t border-border flex justify-between items-center text-[10px] sm:text-xs">
+                  <div className="mt-1.5 pt-1 border-t border-border flex justify-between items-center text-[10px] sm:text-xs">
                     <span className="font-mono text-ink-muted">Bioindicador</span>
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono text-accent font-medium sm:hidden">Ver detalhes</span>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
+                    </div>
                   </div>
                 </div>
-                {/* Hover overlay */}
+                {/* Hover overlay for desktop */}
                 <div className="hidden md:flex absolute inset-0 bg-ink/85 backdrop-blur-sm text-white p-3 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 flex-col justify-center text-center pointer-events-none z-20">
                   <div className="text-xs uppercase tracking-widest mb-2 text-white/60 font-mono">Descrição Científica</div>
                   <div className="text-xs leading-relaxed italic font-serif">{card.description}</div>
@@ -290,6 +307,99 @@ export default function GameBoard({
           </div>
         </div>
       </div>
+
+      {/* Modal de Detalhes da Carta com Descrição Científica (Mobile / Desktop) */}
+      <AnimatePresence>
+        {selectedCard && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-sm"
+            onClick={() => setSelectedCard(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gameboard-card-title"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface rounded-2xl max-w-sm w-full shadow-2xl border border-border overflow-hidden relative flex flex-col"
+            >
+              <div className="p-4 flex justify-between items-start border-b border-border bg-surface relative z-10">
+                <div className="min-w-0 flex-1 mr-3">
+                  <h3 id="gameboard-card-title" className="text-xl font-bold font-serif italic leading-tight">{selectedCard.name}</h3>
+                  <div className="text-xs text-ink-muted font-mono mt-0.5">{selectedCard.group}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="score-badge text-sm w-9 h-9"
+                    style={{
+                      backgroundColor: selectedCard.color,
+                      color: shouldUseDarkText(selectedCard.color) ? '#1C1917' : '#ffffff',
+                    }}
+                  >
+                    {selectedCard.score}
+                  </div>
+                  <button
+                    onClick={() => setSelectedCard(null)}
+                    className="p-1.5 rounded-full hover:bg-surface-alt text-ink-muted hover:text-ink transition-colors"
+                    aria-label="Fechar"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="h-52 sm:h-60 w-full relative border-b border-border overflow-hidden flex items-center justify-center p-4"
+                style={{
+                  background: `radial-gradient(circle at 50% 50%, ${selectedCard.color}30 0%, #FAFAF9 80%)`,
+                }}
+              >
+                <img
+                  src={selectedCard.image}
+                  alt={selectedCard.name}
+                  className="w-full h-full max-h-full object-contain scale-125 drop-shadow-xl z-10"
+                  referrerPolicy="no-referrer"
+                />
+                <div
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[130px] font-serif italic font-bold opacity-[0.05] pointer-events-none select-none z-0"
+                  style={{ color: selectedCard.color }}
+                >
+                  {selectedCard.score}
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4 bg-surface">
+                <div>
+                  <div className="text-xs uppercase tracking-widest font-mono text-ink-muted mb-1">
+                    Descrição Científica
+                  </div>
+                  <p className="text-sm text-ink-secondary leading-relaxed font-serif italic">
+                    {selectedCard.description}
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-border flex justify-between items-center text-xs font-mono">
+                  <span className="text-ink-muted">Sensibilidade à Poluição</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">{selectedCard.score} / 10 pts</span>
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedCard.color }} />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedCard(null)}
+                  className="btn btn-primary w-full mt-2"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -187,6 +187,16 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
                   key={`gallery-f-${idx}`}
                   onClick={() => setSelectedCard(card)}
                   className="family-card flex flex-col group cursor-pointer relative min-h-[320px] sm:min-h-[350px] md:min-h-[370px]"
+                  title={`${card.name} - Toque para ver a descrição científica`}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedCard(card);
+                    }
+                  }}
+                  aria-label={`Ver detalhes e descrição científica de ${card.name}`}
                 >
                   <div className="p-2.5 sm:p-3 flex justify-between items-start border-b border-border bg-surface relative z-10 rounded-t-lg">
                     <div className="min-w-0 flex-1 mr-2">
@@ -221,11 +231,15 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
                   <div className="p-2.5 sm:p-3 flex flex-col justify-between flex-grow bg-surface rounded-b-lg">
                     <div>
                       <div className="text-[11px] sm:text-xs text-ink-muted font-mono mb-1 truncate">{card.group}</div>
+                      <div className="text-[9px] uppercase tracking-wider font-mono text-ink-muted mb-0.5 sm:hidden">Descrição Científica</div>
                       <div className="text-xs leading-snug text-ink-secondary line-clamp-2 sm:line-clamp-3">{card.description}</div>
                     </div>
                     <div className="mt-2 pt-1.5 sm:pt-2 border-t border-border flex justify-between items-center text-[11px] sm:text-xs">
                       <span className="font-mono text-ink-muted">Bioindicador</span>
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-accent font-medium sm:hidden">Ver detalhes</span>
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
+                      </div>
                     </div>
                   </div>
                   {/* Hover overlay with glassmorphism for desktop */}
@@ -266,14 +280,12 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
               {ACTION_CARDS_DATA.map((card, idx) => (
                 <div
                   key={`gallery-a-${idx}`}
-                  className={`action-card flex flex-col group overflow-hidden ${
-                    card.category === 'impact' ? 'action-card-impact' : 'action-card-mitigation'
-                  }`}
+                  className={`action-card flex flex-col group overflow-hidden ${card.category === 'impact' ? 'action-card-impact' : 'action-card-mitigation'
+                    }`}
                 >
                   {/* Top Tag */}
-                  <div className={`w-full px-4 py-2 text-xs font-mono uppercase tracking-widest text-white flex justify-between items-center ${
-                    card.category === 'impact' ? 'tag-impact' : 'tag-mitigation'
-                  }`}>
+                  <div className={`w-full px-4 py-2 text-xs font-mono uppercase tracking-widest text-white flex justify-between items-center ${card.category === 'impact' ? 'tag-impact' : 'tag-mitigation'
+                    }`}>
                     <span>{card.category === 'impact' ? 'Impacto Ambiental' : 'Mitigação de Impacto'}</span>
                     {card.category === 'impact' ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
                   </div>
