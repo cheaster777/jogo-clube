@@ -59,7 +59,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 interface AuthPayload {
   user?: ApiUser | User | null;
   profile?: ApiProfile | null;
-  session?: ApiSession | Session | null;
+  session?: Session | null;
 }
 
 function getAuthPayload(response: unknown): AuthPayload {
