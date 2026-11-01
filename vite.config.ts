@@ -12,6 +12,7 @@ export default defineConfig({
       // update. Activating it mid-match would drop the lazy chunks that the
       // running page still needs.
       registerType: 'prompt',
+      filename: 'service-worker.js',
       injectRegister: false,
       // The manifest lives in public/manifest.json and is linked by index.html.
       manifest: false,

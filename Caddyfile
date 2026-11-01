@@ -16,11 +16,29 @@
         reverse_proxy api:3001
     }
 
-    @immutableAssets path /assets/*
+    @immutableAssets {
+        path /assets/*
+        file {
+            root /srv
+        }
+    }
     header @immutableAssets Cache-Control "public, max-age=31536000, immutable"
 
-    @entrypoint path / /index.html /sw.js /manifest.json
+    @entrypoint path / /index.html /service-worker.js /manifest.json
     header @entrypoint Cache-Control "no-cache"
+
+    # Without this, a missing asset would receive index.html, and Cloudflare
+    # would cache that HTML under the asset URL.
+    @missingAsset {
+        path /assets/*
+        not file {
+            root /srv
+        }
+    }
+    handle @missingAsset {
+        header Cache-Control "no-store"
+        respond 404
+    }
 
     handle {
         root * /srv
