@@ -11,6 +11,8 @@ services:
     image: ${FRONTEND_IMAGE:-jogo-clube-frontend:local}
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      # Domínio anterior: redireciona para SITE_ADDRESS e remove o service worker antigo.
+      LEGACY_SITE_ADDRESS: ${LEGACY_SITE_ADDRESS:-legacy.localhost}
       # Vazio (padrão): Caddy assume HTTPS e emite certificado próprio via ACME.
       # "http://": desativa o ACME do Caddy quando o TLS é terminado na borda
       # (ex.: atrás de um Cloudflare Tunnel), servindo HTTP puro internamente.

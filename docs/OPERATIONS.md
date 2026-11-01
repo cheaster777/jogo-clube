@@ -16,6 +16,10 @@ A produção roda no Easypanel da VPS `161.97.69.249`, no projeto `clube-ciencia
 serviço Compose `jogo`, e recebe tráfego por um túnel Cloudflare. O push em
 `main` executa apenas o CI: ele não atualiza o site.
 
+O domínio é `jogo.clubedecienciasbona.com.br`. O domínio anterior,
+`jogo.tonicoimbra.com`, redireciona para ele por `LEGACY_SITE_ADDRESS`. O DNS fica
+no Cloudflare, e o túnel é o `clube-ciencia-vps`.
+
 O Compose do Easypanel é inline e fixa o commit no `build.context` dos serviços
 `web` e `api`. Para publicar uma versão:
 
