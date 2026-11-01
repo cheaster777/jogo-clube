@@ -19,7 +19,7 @@
     @immutableAssets path /assets/*
     header @immutableAssets Cache-Control "public, max-age=31536000, immutable"
 
-    @entrypoint path / /index.html
+    @entrypoint path / /index.html /sw.js /manifest.json
     header @entrypoint Cache-Control "no-cache"
 
     handle {

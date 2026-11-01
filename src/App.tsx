@@ -4,6 +4,7 @@ import { Info, RotateCcw, ArrowLeft, LogOut, Droplets, AlertTriangle, ShieldChec
 import type { ActionCard, FamilyCard } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
+import InstallPrompt from './components/InstallPrompt';
 import { isApiConfigured } from './lib/api';
 import { getWaterQuality } from './lib/cardDisplay';
 import { isSupabaseMode } from './lib/supabase';
@@ -291,8 +292,15 @@ export default function App() {
     );
   }
 
+  const installPrompt = <InstallPrompt paused={phase === 'playing' || phase === 'action'} />;
+
   if (!user && !localMode) {
-    return <AuthScreen />;
+    return (
+      <>
+        <AuthScreen />
+        {installPrompt}
+      </>
+    );
   }
 
   const showStatBar = phase !== 'setup' && phase !== 'home' && phase !== 'leaderboard' && phase !== 'gameOver';
@@ -454,6 +462,8 @@ export default function App() {
           </AnimatePresence>
         </Suspense>
       </main>
+
+      {installPrompt}
 
       {/* ==================== RULES MODAL ==================== */}
       <Suspense fallback={null}>

@@ -27,6 +27,15 @@ O banco não publica a porta 5432. A API aplica as migrações automaticamente n
 npm run db:migrate
 ```
 
+## PWA
+
+O build gera o service worker com `vite-plugin-pwa`; em `npm run dev` ele fica desligado. Para testar a instalação, use `npm run build && npm run preview`.
+
+- No celular, `src/components/InstallPrompt.tsx` oferece a instalação ao abrir o site. No Android, abre o prompt do navegador. No iOS, mostra as instruções da Tela de Início, porque o Safari não tem prompt.
+- O banner não aparece durante a partida, no computador, no app já instalado nem no app Capacitor. Depois de uma recusa, volta em 14 dias.
+- A nova versão espera o jogador tocar em "Atualizar", para não recarregar a página no meio de uma partida.
+- `/api` e `/health` nunca passam pelo cache do service worker. Imagens das cartas entram em cache no primeiro uso.
+
 ## Arquitetura e operação
 
 - `src/game/`: motor determinístico compartilhado pelo adaptador local e pela API.

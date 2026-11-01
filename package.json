@@ -15,7 +15,7 @@
     "server:bundle": "esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist-server/index.js --packages=external",
     "db:migrate": "node scripts/migrate.mjs",
     "server:test": "node --import tsx --test tests/server/*.test.ts",
-    "test": "node --import tsx --test tests/game/rules.test.ts tests/server/*.test.ts tests/migration/users-import.test.ts",
+    "test": "node --import tsx --test tests/game/rules.test.ts tests/server/*.test.ts tests/migration/users-import.test.ts tests/pwa/install-mode.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -46,6 +46,8 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^2.0.0",
+    "workbox-window": "^7.4.1"
   }
 }
