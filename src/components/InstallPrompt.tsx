@@ -49,7 +49,7 @@ export default function InstallPrompt({ paused }: InstallPromptProps) {
           ) : (
             <>
               <div className="flex items-center gap-3">
-                <img src="/assets/icons/pwa-192.png" alt="" className="h-12 w-12 shrink-0 rounded-lg border border-border" />
+                <img src="/assets/icons/app-icon-192.png" alt="" className="h-12 w-12 shrink-0 rounded-lg border border-border" />
                 <div>
                   <p id="pwa-banner-title" className="font-bold text-ink">Instalar o Clube de Ciências?</p>
                   <p className="text-sm text-ink-secondary">Abra o jogo direto da tela inicial do celular.</p>
