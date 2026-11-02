@@ -60,6 +60,9 @@ certificado. Crie o CNAME pelo painel do Cloudflare.
 
 O CSP do site proíbe estilos inline. Use classes em `site/public/css/site.css`.
 
+O Cloudflare ofusca emails no HTML com um script que esse CSP bloqueia. Mantenha todo
+endereço de email entre `<!--email_off-->` e `<!--/email_off-->`.
+
 A pasta `site/_legado` guarda o site antigo e as fotos originais. Ela existe só na
 máquina local e está fora do Git.
 
