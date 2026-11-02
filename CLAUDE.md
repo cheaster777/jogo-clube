@@ -51,5 +51,6 @@ The DB container never publishes 5432; the API applies migrations on container s
 
 ## Notes
 
+- `site/` is the static public site at clubedecienciasbona.com.br (HTML and CSS only, own Caddy container). It follows the game's design system; deploy steps are in `docs/OPERATIONS.md`.
 - `.agent/` is a large generic third-party "Antigravity Kit" agent/skill toolkit, not project-specific documentation — don't treat its `ARCHITECTURE.md` as describing this app.
 - `AGENTS.md` at the repo root describes the old pure-Supabase architecture and is out of date relative to `README.md` and the current `server/` code; prefer this file and `README.md`/`docs/` over `AGENTS.md`.

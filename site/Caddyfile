@@ -1,0 +1,45 @@
+{
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	root * /srv
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000"
+		Content-Security-Policy "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src https://static.cloudflareinsights.com; connect-src https://cloudflareinsights.com;"
+	}
+
+	# The container answers plain HTTP behind the Cloudflare tunnel.
+	@www host www.clubedecienciasbona.com.br
+	redir @www https://clubedecienciasbona.com.br{uri} permanent
+
+	@plainHttp header X-Forwarded-Proto http
+	redir @plainHttp https://{host}{uri} permanent
+
+	@health path /health
+	respond @health "ok" 200
+
+	@staticFiles path /css/* /fonts/* /img/*
+	header @staticFiles Cache-Control "public, max-age=604800"
+
+	@pages path / /index.html /estudo.html /404.html
+	header @pages Cache-Control "no-cache"
+
+	# A missing file returns 404, so Cloudflare never stores HTML under an asset URL.
+	handle_errors {
+		@notFound expression {err.status_code} == 404
+		rewrite @notFound /404.html
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	file_server
+}

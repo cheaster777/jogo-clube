@@ -37,6 +37,32 @@ guarda em cache por extensão, e a resposta de fallback ficaria em cache nessa U
 
 O cadastro exige entrega de email em produção. Nunca use `EMAIL_MODE=console` em produção; esse modo só serve para desenvolvimento, combinado com `RESET_TOKEN_EXPOSE=true` fora de produção para testes locais. O frontend compilado deve receber `VITE_API_BASE_URL=/api/v1` (o valor padrão do Docker).
 
+## Site institucional
+
+O site `https://clubedecienciasbona.com.br` é estático e fica em `site/public`.
+Ele roda no serviço `site` do mesmo Compose do Easypanel, com build em
+`https://github.com/cheaster777/jogo-clube.git#<SHA>:site`. O hostname `www`
+redireciona para a raiz, e o container responde em `GET /health`.
+
+Para publicar uma versão:
+
+1. Troque o SHA no `build.context` do serviço `site` e execute o deploy.
+2. Ao alterar `site/public/css/site.css`, aumente o `?v=` nas três páginas. O CSS
+   fica em cache por 7 dias.
+
+O túnel encaminha o site por `/home/hermes/clubeciencia-migracao-private/cloudflare-tunnel.yml`
+na VPS. Um hostname novo exige reiniciar o container `cloudflared` e criar um CNAME
+com proxy para `<id do túnel>.cfargotunnel.com` no Cloudflare.
+
+O `cert.pem` do `cloudflared` nesta máquina e na VPS só cobre a zona
+`tonicoimbra.com`. Não use `cloudflared tunnel route dns` para este domínio com esse
+certificado. Crie o CNAME pelo painel do Cloudflare.
+
+O CSP do site proíbe estilos inline. Use classes em `site/public/css/site.css`.
+
+A pasta `site/_legado` guarda o site antigo e as fotos originais. Ela existe só na
+máquina local e está fora do Git.
+
 ## Android/Capacitor
 
 O app nativo deve apontar para a mesma API HTTPS, sem embutir chaves administrativas:

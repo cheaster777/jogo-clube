@@ -329,7 +329,7 @@ export default function App() {
         </button>
         <div className="shrink-0 flex gap-1.5 md:gap-4 items-center">
           <a
-            href="https://clubedecienciasbona.com/"
+            href="https://clubedecienciasbona.com.br/"
             className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border-strong text-xs font-bold text-ink-secondary hover:bg-surface-alt hover:text-ink transition-all"
             target="_blank"
             rel="noopener noreferrer"
