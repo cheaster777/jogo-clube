@@ -36,12 +36,15 @@ export default function RulesModal({ open, onClose }: RulesModalProps) {
   // Foco/teclado do modal de Regras: guarda quem abriu, foca o botão de
   // fechar ao abrir, restaura o foco ao fechar, Esc fecha, Tab fica preso.
   useEffect(() => {
-    if (open) {
-      rulesTriggerElementRef.current = document.activeElement as HTMLElement | null;
-      rulesCloseButtonRef.current?.focus();
-    } else {
-      rulesTriggerElementRef.current?.focus();
-    }
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    rulesTriggerElementRef.current = document.activeElement as HTMLElement | null;
+    rulesCloseButtonRef.current?.focus({ preventScroll: true });
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      rulesTriggerElementRef.current?.focus({ preventScroll: true });
+    };
   }, [open]);
 
   useEffect(() => {
@@ -93,18 +96,18 @@ export default function RulesModal({ open, onClose }: RulesModalProps) {
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
-            className="bg-surface max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 rounded-xl shadow-xl"
+            className="bg-surface max-w-2xl w-full max-h-[calc(100dvh-2rem)] md:max-h-[calc(100dvh-3rem)] overflow-y-auto overscroll-contain p-6 md:p-8 rounded-xl shadow-xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-between items-start mb-8 border-b border-border pb-4">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-2xl md:text-3xl font-bold italic font-serif tracking-tight">Regras do Jogo</h2>
                 <p className="text-xs font-mono uppercase tracking-widest text-ink-muted mt-1">Clube de Ciências de Bona — Bioindicadores</p>
               </div>
               <button
                 ref={rulesCloseButtonRef}
                 onClick={onClose}
-                className="min-w-[44px] min-h-[44px] p-2 hover:bg-surface-alt rounded-lg transition-colors"
+                className="shrink-0 min-w-[44px] min-h-[44px] p-2 hover:bg-surface-alt rounded-lg transition-colors"
                 aria-label="Fechar regras"
                 id="btn-close-rules"
               >

@@ -142,7 +142,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       const nestedError = errorPayload?.error && typeof errorPayload.error === 'object'
         ? errorPayload.error as Record<string, unknown>
         : undefined;
-      if (response.status === 401) unauthorizedHandler?.();
+      // Public auth endpoints reject credentials/tokens with 401 too. Only a
+      // protected request proves that the browser's current session expired.
+      const publicAuthRequest = path.startsWith('/auth/') && path !== '/auth/logout';
+      if (response.status === 401 && !publicAuthRequest) unauthorizedHandler?.();
       throw new ApiError(
         getErrorMessage(payload, fallback),
         response.status,

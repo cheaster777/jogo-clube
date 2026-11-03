@@ -13,6 +13,7 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [token, setToken] = useState('');
+  const [tokenFromLink, setTokenFromLink] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
       setMode('reset');
     }
     if (verificationToken || resetToken) {
+      setTokenFromLink(true);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -43,6 +45,7 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
     setConfirmPassword('');
     setFullName('');
     setToken('');
+    setTokenFromLink(false);
     setError(null);
     setSuccess(null);
     setNeedsVerification(false);
@@ -100,7 +103,9 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
     const { error, requiresEmailVerification } = await signUp(email, password, fullName);
     if (error) {
       setError(translateError(error.message));
+      if (error.code === 'EMAIL_UNAVAILABLE') setNeedsVerification(true);
     } else if (requiresEmailVerification) {
+      setNeedsVerification(true);
       setSuccess(`Enviamos um link para ${email}. Confirme para entrar.`);
     } else {
       setSuccess('Conta criada com sucesso! Entrando automaticamente...');
@@ -154,6 +159,12 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
 
   const translateError = (msg: string): string => {
     const m = msg.toLowerCase();
+
+    if ((mode === 'verify' || mode === 'reset') && m.includes('token')) {
+      return mode === 'verify'
+        ? 'Este link de confirmação é inválido ou expirou. Solicite um novo link de confirmação.'
+        : 'Este link de recuperação é inválido ou expirou. Solicite um novo link em “Esqueci minha senha”.';
+    }
 
     // Already registered / Conflict
     if (
@@ -260,7 +271,7 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
                     }}
                     className="flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink transition-colors mb-4"
                   >
-                    <ArrowLeft size={14} /> Voltar ao login
+                    <ArrowLeft size={14} /> {user ? 'Voltar ao jogo' : 'Voltar ao login'}
                   </button>
                 )}
                 <h2 className="text-xl font-bold font-serif italic">{titles[mode].title}</h2>
@@ -408,6 +419,8 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
                         placeholder="Seu nome"
                         required
                         autoComplete="name"
+                        minLength={2}
+                        maxLength={80}
                         id="signup-name"
                       />
                     </div>
@@ -503,10 +516,10 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
 
               {mode === 'verify' && !success && (
                 <form onSubmit={handleVerifyEmail} className="space-y-4">
-                  <div>
+                  {!tokenFromLink && <div>
                     <label htmlFor="verification-token" className="label block mb-1.5">Token de confirmação</label>
                     <input id="verification-token" value={token} onChange={event => setToken(event.target.value)} className="input-field font-mono text-xs" required />
-                  </div>
+                  </div>}
                   <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
                     {loading ? <Loader2 size={18} className="animate-spin" /> : 'Confirmar email'}
                   </button>
@@ -515,10 +528,10 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
 
               {mode === 'reset' && !success && (
                 <form onSubmit={handleConfirmReset} className="space-y-4">
-                  <div>
+                  {!tokenFromLink && <div>
                     <label htmlFor="reset-token" className="label block mb-1.5">Token de recuperação</label>
                     <input id="reset-token" value={token} onChange={event => setToken(event.target.value)} className="input-field font-mono text-xs" required />
-                  </div>
+                  </div>}
                   <div>
                     <label htmlFor="new-password" className="label block mb-1.5">Nova senha</label>
                     <div className="relative">
@@ -583,6 +596,13 @@ export default function AuthScreen({ onComplete }: { onComplete?: () => void }) 
                 </form>
               )}
 
+              {mode === 'signup' && needsVerification && (
+                <div className="text-center pt-2">
+                    <button type="button" onClick={handleResendVerification} disabled={loading} className="btn btn-secondary w-full mb-3">
+                      {loading ? 'Enviando...' : 'Reenviar confirmação de email'}
+                    </button>
+                </div>
+              )}
               {success && (
                 <div className="text-center pt-2">
                   <button

@@ -75,6 +75,8 @@ export default function App() {
   const [localGame, setLocalGame] = useState<LocalGameState | null>(null);
   const [gameMode, setGameMode] = useState<GameMode>('local');
   const [emailAction, setEmailAction] = useState(hasEmailAction);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const serverMatch = useServerMatch({
     enabled: gameMode === 'server' && Boolean(user),
     phase,
@@ -224,10 +226,10 @@ export default function App() {
   }, [loading, user, localMode, syncLocalGame, emailAction, serverMatch.resume]);
 
   useEffect(() => {
-    if (!user || gameMode !== 'server' || !serverMatch.matchId || !serverMatch.state) return;
+    if (!user || gameMode !== 'server' || !serverMatch.matchId) return;
     try {
       const key = serverMatchKey(user.id);
-      if (serverMatch.state.phase === 'gameOver') window.sessionStorage.removeItem(key);
+      if (serverMatch.state?.phase === 'gameOver') window.sessionStorage.removeItem(key);
       else {
         window.sessionStorage.setItem(key, serverMatch.matchId);
         clearSavedLocalMatch();
@@ -330,8 +332,19 @@ export default function App() {
   }, [serverMatch]);
 
   const handleSignOut = useCallback(async () => {
+    if (signingOut) return;
     if (inMatch && !window.confirm('Sair da conta vai descartar a expedição atual. Continuar?')) {
       return;
+    }
+    setSigningOut(true);
+    setSignOutError(null);
+    try {
+      await signOut();
+    } catch {
+      setSignOutError('Não foi possível sair da conta. Verifique sua conexão e tente novamente.');
+      return;
+    } finally {
+      setSigningOut(false);
     }
     clearSavedMatch();
     serverMatch.reset();
@@ -343,8 +356,7 @@ export default function App() {
     setLastAction(null);
     setActionMessage('');
     setLocalGame(null);
-    await signOut();
-  }, [inMatch, serverMatch, signOut, clearSavedMatch]);
+  }, [inMatch, serverMatch, signOut, clearSavedMatch, signingOut]);
 
   const serverMatchForBoard = useMemo(() => ({
     loading: serverMatch.loading,
@@ -455,6 +467,7 @@ export default function App() {
             </div>
             <button
               onClick={() => void handleSignOut()}
+              disabled={signingOut}
               className="min-w-[44px] min-h-[44px] p-3 hover:bg-danger-light rounded-lg transition-all text-ink-secondary hover:text-danger-text"
               title="Sair da conta"
               aria-label="Sair da conta"
@@ -467,6 +480,9 @@ export default function App() {
       </header>
 
       <main className={`max-w-7xl mx-auto p-4 md:p-6 ${inMatch ? 'pb-[calc(6rem+env(safe-area-inset-bottom))]' : ''}`}>
+        {signOutError && (
+          <p role="alert" className="mb-4 p-3 rounded-lg bg-danger-light text-danger-text text-sm">{signOutError}</p>
+        )}
         <Suspense fallback={<PhaseFallback />}>
           <AnimatePresence mode="wait">
 

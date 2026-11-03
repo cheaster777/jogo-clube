@@ -142,6 +142,7 @@
     color: var(--color-ink);
     background-color: var(--color-bg);
     padding-bottom: env(safe-area-inset-bottom);
+    overflow-wrap: anywhere;
   }
 
   /* --- Headings: serif for display --- */
@@ -150,6 +151,7 @@
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.1;
+    overflow-wrap: anywhere;
   }
 
   /* --- Selection --- */
@@ -212,8 +214,9 @@
     font-size: var(--text-sm);
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    height: 44px;
-    padding: 0 24px;
+    min-height: 44px;
+    max-width: 100%;
+    padding: 10px 24px;
     border-radius: var(--radius-md);
     transition:
       background-color var(--transition-normal),
@@ -221,7 +224,9 @@
       box-shadow var(--transition-normal),
       transform var(--transition-normal);
     cursor: pointer;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 
   .btn:disabled {
@@ -271,8 +276,8 @@
   }
 
   .btn-lg {
-    height: 52px;
-    padding: 0 32px;
+    min-height: 52px;
+    padding: 12px 32px;
     font-size: var(--text-base);
   }
 

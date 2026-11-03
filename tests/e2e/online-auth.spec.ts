@@ -67,12 +67,13 @@ for (const action of ['verify', 'reset']) {
     await page.goto(`/#${action}=token-de-teste-com-mais-de-16-caracteres`);
     await expect(page.getByRole('heading', { name: action === 'verify' ? 'Confirmar Email' : 'Nova Senha' })).toBeVisible();
     expect(new URL(page.url()).hash).toBe('');
+    await expect(page.locator('#verification-token, #reset-token')).toHaveCount(0);
     if (action === 'reset') {
       await page.locator('#new-password').fill('SenhaNova123!');
       await page.locator('#new-password-confirm').fill('SenhaNova123!');
     }
     await page.getByRole('button', { name: action === 'verify' ? 'Confirmar email' : 'Atualizar senha', exact: true }).click();
-    await page.getByRole('button', { name: 'Voltar ao jogo' }).click();
+    await page.getByRole('button', { name: 'Voltar ao jogo' }).last().click();
     await expect(page.getByRole('button', { name: 'Começar Expedição' })).toBeVisible();
   });
 }
@@ -95,5 +96,106 @@ test('recuperar senha com sessão revogada permite entrar novamente', async ({ p
   await page.locator('#login-email').fill('online@example.com');
   await page.locator('#login-password').fill('SenhaNova123!');
   await page.locator('#btn-login').click();
+  await expect(page.getByRole('button', { name: 'Começar Expedição' })).toBeVisible();
+});
+
+for (const action of ['verify', 'reset']) {
+  test(`link ${action} inválido explica o problema e preserva a sessão atual`, async ({ page }) => {
+    const endpoint = action === 'verify' ? 'email-verification' : 'password-reset';
+    await page.route(`**/api/v1/auth/${endpoint}/confirm`, route => route.fulfill({ status: 401, json: { message: 'Token inválido ou expirado.' } }));
+    await page.goto(`/#${action}=token-de-teste-com-mais-de-16-caracteres`);
+    if (action === 'reset') {
+      await page.locator('#new-password').fill('SenhaNova123!');
+      await page.locator('#new-password-confirm').fill('SenhaNova123!');
+    }
+    await page.getByRole('button', { name: action === 'verify' ? 'Confirmar email' : 'Atualizar senha', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('inválido ou expirou');
+    await expect(page.getByRole('alert')).not.toContainText('Email ou senha');
+    await page.getByRole('button', { name: 'Voltar ao jogo' }).click();
+    await expect(page.getByRole('button', { name: 'Começar Expedição' })).toBeVisible();
+  });
+}
+
+test('cadastro permite reenviar confirmação sem preencher tudo novamente', async ({ page }) => {
+  await page.route('**/api/v1/me', route => route.fulfill({ status: 401, json: {} }));
+  await page.route('**/api/v1/auth/register', route => route.fulfill({ status: 201, json: { requires_email_verification: true } }));
+  let resendEmail: string;
+  await page.route('**/api/v1/auth/email-verification/resend', route => {
+    resendEmail = route.request().postDataJSON().email;
+    return route.fulfill({ json: {} });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  await page.locator('#signup-name').fill('Ana Cientista');
+  await page.locator('#signup-email').fill('ana@example.com');
+  await page.locator('#signup-password').fill('SenhaNova123!');
+  await page.locator('#signup-confirm-password').fill('SenhaNova123!');
+  await page.locator('#btn-signup').click();
+  await page.getByRole('button', { name: 'Reenviar confirmação de email' }).click();
+  await expect.poll(() => resendEmail).toBe('ana@example.com');
+  await expect(page.getByRole('status')).toContainText('um novo link foi enviado');
+});
+
+test('logout com falha de conexão mantém conta visível e permite repetir', async ({ page }) => {
+  await page.route('**/api/v1/auth/logout', route => route.abort());
+  await page.goto('/');
+  await page.locator('#btn-logout').click();
+  await expect(page.getByRole('alert')).toContainText('Não foi possível sair da conta');
+  await expect(page.getByRole('button', { name: 'Começar Expedição' })).toBeVisible();
+  await page.route('**/api/v1/auth/logout', route => route.fulfill({ status: 204 }));
+  await page.locator('#btn-logout').click();
+  await expect(page.getByRole('heading', { name: 'Bem-vindo de volta' })).toBeVisible();
+});
+
+test('retenta snapshot da sala criada sem criar uma segunda sala', async ({ page }) => {
+  let creates = 0;
+  let unavailable = true;
+  await page.route('**/api/v1/matches', route => {
+    creates++;
+    return route.fulfill({ status: 201, json: { id: matchId, version: 7 } });
+  });
+  await page.route(`**/api/v1/matches/${matchId}`, route => route.fulfill(unavailable
+    ? { status: 503, json: { message: 'Servidor indisponível.' } }
+    : { json: snapshot }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Começar Expedição' }).click();
+  await page.getByRole('button', { name: 'Online com ranking' }).click();
+  await page.locator('#btn-init-game').click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect(await page.evaluate(key => sessionStorage.getItem(key), savedKey)).toBe(matchId);
+  unavailable = false;
+  await page.locator('#btn-init-game').click();
+  await expect(page.locator('#btn-draw-action')).toBeVisible();
+  expect(creates).toBe(1);
+});
+
+test('cadastro com falha no envio oferece recuperar a confirmação', async ({ page }) => {
+  await page.route('**/api/v1/me', route => route.fulfill({ status: 401, json: {} }));
+  await page.route('**/api/v1/auth/register', route => route.fulfill({ status: 503, json: { error: { code: 'EMAIL_UNAVAILABLE', message: 'Não foi possível enviar o email de confirmação.' } } }));
+  await page.route('**/api/v1/auth/email-verification/resend', route => route.fulfill({ json: {} }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  await page.locator('#signup-name').fill('Ana Cientista');
+  await page.locator('#signup-email').fill('ana@example.com');
+  await page.locator('#signup-password').fill('SenhaNova123!');
+  await page.locator('#signup-confirm-password').fill('SenhaNova123!');
+  await page.locator('#btn-signup').click();
+  await expect(page.getByRole('alert')).toContainText('enviar o email');
+  await page.getByRole('button', { name: 'Reenviar confirmação de email' }).click();
+  await expect(page.getByRole('status')).toContainText('um novo link foi enviado');
+});
+
+test('voltar no navegador permite cancelar ou abandonar a partida', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Começar Expedição' }).click();
+  await page.locator('#btn-init-game').click();
+  await expect(page.locator('#btn-draw-action')).toBeVisible();
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.goBack();
+  await expect(page.locator('#btn-draw-action')).toBeVisible();
+  page.once('dialog', dialog => dialog.accept());
+  await page.goBack();
+  await expect(page.getByRole('button', { name: 'Começar Expedição' })).toBeVisible();
+  await page.reload();
   await expect(page.getByRole('button', { name: 'Começar Expedição' })).toBeVisible();
 });

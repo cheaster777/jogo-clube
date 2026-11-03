@@ -151,6 +151,10 @@ export function useServerMatch({ enabled, phase, playerCount, playerNames }: Use
       setError('Partidas com ranking oficial ainda não estão disponíveis neste ambiente.');
       return;
     }
+    if (matchId) {
+      await resume(matchId).catch(() => undefined);
+      return;
+    }
     const generation = ++generationRef.current;
     versionRef.current = 0;
     setLoading(true);
@@ -161,6 +165,11 @@ export function useServerMatch({ enabled, phase, playerCount, playerNames }: Use
         playerCount,
         playerNames,
       });
+      if (generation !== generationRef.current) return;
+      // Preserve the created room even if fetching its snapshot fails. Polling
+      // can then reconnect to this room without creating a duplicate match.
+      setMatchId(created.id);
+      setJoinMatchId(created.id);
       const snapshot = await apiClient.getMatch(created.id) as ServerMatchSnapshot;
       if (generation !== generationRef.current) return;
       setMatchId(created.id);
@@ -174,7 +183,7 @@ export function useServerMatch({ enabled, phase, playerCount, playerNames }: Use
     } finally {
       if (generation === generationRef.current) setLoading(false);
     }
-  }, [applySnapshot, playerCount, playerNames]);
+  }, [applySnapshot, playerCount, playerNames, matchId, resume]);
 
   const join = useCallback(async () => {
     const id = joinMatchId.trim();

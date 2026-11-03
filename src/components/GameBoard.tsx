@@ -281,8 +281,8 @@ export default function GameBoard({
                   {lastAction.category === 'impact' ? <AlertTriangle size={16} /> : <ShieldCheck size={16} />}
                 </div>
 
-                <div className="md:grid md:grid-cols-[5fr_6fr]">
-                  <div className="h-36 md:h-auto md:min-h-[360px] w-full overflow-hidden relative bg-surface-alt">
+                <div className="flex flex-col md:grid md:grid-cols-[5fr_6fr]">
+                  <div className="order-2 md:order-none h-36 md:h-auto md:min-h-[360px] w-full overflow-hidden relative bg-surface-alt">
                     <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #1C1917 0, #1C1917 1px, transparent 0, transparent 50%)', backgroundSize: '10px 10px' }}></div>
                     <motion.img
                       initial={{ scale: 0.8, rotate: lastAction.category === 'impact' ? -10 : 10, y: 50, opacity: 0 }}
@@ -296,9 +296,9 @@ export default function GameBoard({
                     />
                   </div>
 
-                  <div className="p-4 md:p-6 bg-surface z-10 relative flex flex-col">
-                    <div className="flex items-start justify-between gap-4 mb-3">
-                      <h2 className="text-2xl md:text-3xl font-bold italic font-serif tracking-tight leading-tight">{lastAction.title}</h2>
+                  <div className="contents md:flex md:flex-col md:p-6 md:bg-surface md:z-10 md:relative">
+                    <div className="order-0 md:order-none flex items-start justify-between gap-4 mb-3 px-4 pt-4 md:p-0">
+                      <h2 className="min-w-0 break-words text-2xl md:text-3xl font-bold italic font-serif tracking-tight leading-tight">{lastAction.title}</h2>
                       <button
                         type="button"
                         onClick={() => playActionCardSound(lastAction.title)}
@@ -310,7 +310,7 @@ export default function GameBoard({
                       </button>
                     </div>
 
-                    <div className="p-3 md:p-4 bg-surface-alt rounded-lg border border-border mb-4">
+                    <div className="order-1 md:order-none p-3 md:p-4 mx-4 md:mx-0 bg-surface-alt rounded-lg border border-border mb-4">
                       <div className="label mb-2">Resultado na Mesa</div>
                       <div className="font-bold text-sm tracking-tight">{resultMessage}</div>
                       {Object.keys(scoreDeltas).length > 0 && (
@@ -331,7 +331,7 @@ export default function GameBoard({
                       )}
                     </div>
 
-                    <p className="text-sm text-ink-secondary mb-4 leading-relaxed">{lastAction.description}</p>
+                    <p className="order-3 md:order-none px-4 pt-4 md:p-0 text-sm text-ink-secondary mb-4 leading-relaxed">{lastAction.description}</p>
 
                     <div className="hidden md:block mt-auto">{renderTurnControl(false)}</div>
                   </div>
@@ -350,7 +350,7 @@ export default function GameBoard({
 
         {/* Viewer's Hand */}
         <div className="space-y-4">
-          <div className="flex justify-between items-end gap-3">
+          <div className="flex flex-wrap justify-between items-end gap-3">
             <div className="label">Sua Coleção de Bioindicadores</div>
             <div className="text-sm font-mono shrink-0">Total: <span className="font-bold">{viewerHand?.score ?? 0} pontos</span></div>
           </div>

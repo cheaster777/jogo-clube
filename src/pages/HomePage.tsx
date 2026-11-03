@@ -140,7 +140,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
       </section>
 
       {/* --- About / Science Section --- */}
-      <section className="card p-8 md:p-12 space-y-8" id="about">
+      <section className="card p-8 md:p-12 space-y-8 scroll-mt-24" id="about">
         <div className="max-w-3xl mx-auto text-center space-y-6">
           <h3 className="text-3xl md:text-4xl font-bold font-serif italic tracking-tight">A Ciência por Trás do Jogo</h3>
           <p className="text-ink-secondary leading-relaxed">
@@ -182,7 +182,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
             <div className="divider">
               <h4 className="label">Famílias de Organismos</h4>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
               {visibleFamilyCards.map((card, idx) => (
                 <div
                   key={`gallery-f-${idx}`}
@@ -306,7 +306,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
 
                   <div className="p-5 flex-grow bg-surface z-10 relative">
                     <div className="flex items-center justify-between gap-2 mb-3">
-                      <h5 className="text-xl font-bold font-serif italic leading-tight tracking-tight">{card.title}</h5>
+                      <h5 className="min-w-0 break-words text-xl font-bold font-serif italic leading-tight tracking-tight">{card.title}</h5>
                       <button
                         type="button"
                         onClick={(e) => {

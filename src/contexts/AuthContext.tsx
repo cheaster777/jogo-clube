@@ -221,13 +221,10 @@ function ApiAuthProvider({
       try {
         await apiClient.logout();
       } catch (error) {
-        console.warn('Não foi possível encerrar a sessão no servidor:', error);
-      } finally {
-        setUser(null);
-        setProfile(null);
-        setSession(null);
+        // A failed request leaves the HttpOnly cookie valid. Keep the UI
+        // authenticated so the player can retry instead of promising logout.
+        if (!(error instanceof ApiError && error.status === 401)) throw error;
       }
-      return;
     }
 
     setUser(null);
