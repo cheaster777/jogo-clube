@@ -34,3 +34,10 @@ export function shouldUseDarkText(hexColor: string): boolean {
   const contrastWithWhite = contrastRatio(bgLuminance, relativeLuminance('#FFFFFF'));
   return contrastWithBlack >= contrastWithWhite;
 }
+
+// The engine writes each result from the point of view of the acting player.
+// The same text reaches every seat, so the UI names the actor for the others.
+export function describeActionMessage(message: string, actorName: string, viewerIsActor: boolean): string {
+  const pluralized = message.replace(/(\d+) carta\(s\)/g, (_, count: string) => `${count} ${count === '1' ? 'carta' : 'cartas'}`);
+  return viewerIsActor || !actorName ? pluralized : pluralized.replace(/^Você(?=\s)/, actorName);
+}

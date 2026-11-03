@@ -19,6 +19,8 @@ type GameMode = 'local' | 'server';
 
 interface GameOverPageProps {
   players: Player[];
+  /** Index into `players` of the person looking at this screen. */
+  viewerIndex: number;
   gameMode: GameMode;
   /** Open the rules modal (used by the BMWP water-quality table link). */
   onShowRules: () => void;
@@ -32,27 +34,38 @@ interface GameOverPageProps {
 
 export default function GameOverPage({
   players,
+  viewerIndex,
   gameMode,
   onShowRules,
   onViewRanking,
   onNewGame,
   onGoHome,
 }: GameOverPageProps) {
+  const ranking = [...players].sort((a, b) => b.score - a.score);
+  const winner = ranking[0];
+  // Several people share one screen in a local match, so it never says "Você".
+  const singleViewer = gameMode === 'server' || players.filter(player => !player.isBot).length === 1;
+  const viewerWon = singleViewer && winner !== undefined && winner.id === players[viewerIndex]?.id;
+
   return (
     <motion.div
       key="gameOver"
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="max-w-2xl mx-auto mt-12 md:mt-20 text-center"
+      className="max-w-2xl mx-auto mt-4 md:mt-20 text-center"
     >
-      <div className="inline-block p-5 rounded-2xl bg-warning-light mb-6">
-        <Trophy size={56} className="text-warning" />
-      </div>
-      <h2 className="text-4xl md:text-5xl font-bold italic font-serif mb-4 tracking-tight">Fim da Expedição!</h2>
-      <p className="text-ink-secondary mb-10 leading-relaxed">Após 5 rodadas intensas, os dados foram coletados e o impacto foi medido. Quem melhor preservou o ecossistema?</p>
+      {viewerWon && (
+        <div className="inline-block p-4 rounded-2xl bg-warning-light mb-4">
+          <Trophy size={40} className="text-warning" />
+        </div>
+      )}
+      <h2 className="text-4xl md:text-5xl font-bold italic font-serif mb-3 tracking-tight break-words">
+        {viewerWon ? 'Você venceu!' : `${winner?.name ?? 'Expedição'} venceu`}
+      </h2>
+      <p className="text-ink-secondary mb-6 md:mb-10 leading-relaxed">Após 5 rodadas intensas, os dados foram coletados e o impacto foi medido. Quem melhor preservou o ecossistema?</p>
 
       <div className="grid grid-cols-1 gap-4 mb-10">
-        {[...players].sort((a, b) => b.score - a.score).map((p, idx) => {
+        {ranking.map((p, idx) => {
           const quality = getWaterQuality(p.score);
           return (
             <div
@@ -62,10 +75,10 @@ export default function GameOverPage({
               }`}
               id={`result-player-${p.id}`}
             >
-              <div className="flex items-center gap-4 w-full md:w-auto">
-                <span className="font-mono text-2xl text-ink-muted">#{String(idx + 1).padStart(2, '0')}</span>
-                <div className="text-left">
-                  <div className="font-bold text-lg md:text-xl italic font-serif">{p.name}</div>
+              <div className="flex items-center gap-4 w-full md:w-auto min-w-0">
+                <span className="font-mono text-2xl text-ink-muted">{idx + 1}º</span>
+                <div className="text-left min-w-0">
+                  <div className="font-bold text-lg md:text-xl italic font-serif break-words">{p.name}</div>
                   <div className="text-xs text-ink-muted uppercase tracking-widest">{p.handCount ?? p.hand.length} famílias identificadas</div>
                 </div>
               </div>
@@ -100,24 +113,24 @@ export default function GameOverPage({
         className="inline-flex items-center gap-2 px-4 py-2 bg-surface-alt border border-border rounded-lg text-ink-secondary text-sm font-semibold mb-6"
       >
         {gameMode === 'server'
-          ? 'Resultado calculado pela API e elegível ao ranking oficial.'
-          : 'Partida local: o resultado não é publicado no ranking. Apenas partidas validadas pela API geram pontuação oficial.'}
+          ? 'Resultado oficial, vale para o ranking.'
+          : 'Partida contra bots: não vale para o ranking. Só partidas online contam.'}
       </motion.div>
 
       <div className="flex flex-wrap gap-3 justify-center">
+        <button
+          onClick={onNewGame}
+          className="btn btn-accent btn-lg"
+          id="btn-new-game"
+        >
+          Nova Expedição
+        </button>
         <button
           onClick={onViewRanking}
           className="btn btn-secondary btn-lg"
           id="btn-view-ranking"
         >
           <Trophy size={18} /> Ver Ranking
-        </button>
-        <button
-          onClick={onNewGame}
-          className="btn btn-primary btn-lg"
-          id="btn-new-game"
-        >
-          Nova Expedição
         </button>
         <button
           onClick={onGoHome}

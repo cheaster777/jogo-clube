@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   Play,
   Medal,
@@ -11,12 +11,12 @@ import {
   ShieldCheck,
   ChevronDown,
   ChevronUp,
-  X,
   Volume2,
 } from 'lucide-react';
 import { FAMILY_CARDS_DATA, ACTION_CARDS_DATA, type FamilyCard } from '../constants';
 import { shouldUseDarkText } from '../lib/cardDisplay';
 import { playActionCardSound } from '../lib/audio';
+import CardDetailModal from '../components/CardDetailModal';
 
 // Number of family cards shown before the user opts into the full catalog.
 // Keeps the initial scroll length reasonable; the rest expand on demand.
@@ -51,7 +51,6 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center" id="hero">
         <div className="space-y-6 md:space-y-8">
           <div className="space-y-4">
-            <span className="inline-block text-xs font-mono uppercase tracking-widest bg-accent text-white px-3 py-1.5 rounded-md font-semibold">O Jogo Educativo</span>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold italic font-serif leading-[0.95] tracking-tight text-balance">
               DESCUBRA A <br /> VIDA NOS <br /> <span className="text-accent">RIACHOS</span>
             </h2>
@@ -62,7 +61,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
           <div className="flex flex-wrap gap-3">
             <button
               onClick={onStart}
-              className="btn btn-primary btn-lg gap-3 shadow-md hover:shadow-lg"
+              className="btn btn-accent btn-lg gap-3 shadow-md hover:shadow-lg"
               id="btn-start"
             >
               Começar Expedição <Play size={18} fill="currentColor" />
@@ -102,7 +101,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
             />
           </div>
           <div className="absolute -bottom-4 -left-4 aspect-[2/3] w-40 md:w-48 bg-surface rounded-xl border border-border p-3 -rotate-6 shadow-lg hidden md:block overflow-hidden">
-            <img src={FAMILY_CARDS_DATA[0].image} alt="Card Preview" className="w-full h-44 object-cover mb-2 rounded-lg" referrerPolicy="no-referrer" />
+            <img src={FAMILY_CARDS_DATA[0].image} alt={FAMILY_CARDS_DATA[0].name} className="w-full h-44 object-cover mb-2 rounded-lg" referrerPolicy="no-referrer" />
             <div className="text-sm font-bold font-serif italic">{FAMILY_CARDS_DATA[0].name}</div>
             <div className="text-xs text-ink-muted font-mono uppercase">{FAMILY_CARDS_DATA[0].group}</div>
           </div>
@@ -203,7 +202,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
                   <div className="p-2.5 sm:p-3 flex justify-between items-start border-b border-border bg-surface relative z-10 rounded-t-lg">
                     <div className="min-w-0 flex-1 mr-2">
                       <div className="text-sm font-bold font-serif italic leading-tight truncate">{card.name}</div>
-                      <div className="text-[11px] sm:text-xs text-ink-muted font-mono mt-0.5 truncate">{card.group.split(' - ')[1] || card.group}</div>
+                      <div className="text-xs sm:text-xs text-ink-muted font-mono mt-0.5 truncate">{card.group.split(' - ')[1] || card.group}</div>
                     </div>
                     <div
                       className="score-badge"
@@ -232,15 +231,13 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
                   </div>
                   <div className="p-2.5 sm:p-3 flex flex-col justify-between flex-grow bg-surface rounded-b-lg">
                     <div>
-                      <div className="text-[11px] sm:text-xs text-ink-muted font-mono mb-1 truncate">{card.group}</div>
-                      <div className="text-[9px] uppercase tracking-wider font-mono text-ink-muted mb-0.5 sm:hidden">Descrição Científica</div>
-                      <div className="text-xs leading-snug text-ink-secondary line-clamp-2 sm:line-clamp-3">{card.description}</div>
+                      <div className="text-xs sm:text-xs text-ink-muted font-mono mb-1 truncate">{card.group}</div>
+                                            <div className="text-xs leading-snug text-ink-secondary line-clamp-2 sm:line-clamp-3">{card.description}</div>
                     </div>
-                    <div className="mt-2 pt-1.5 sm:pt-2 border-t border-border flex justify-between items-center text-[11px] sm:text-xs">
+                    <div className="mt-2 pt-1.5 sm:pt-2 border-t border-border flex justify-between items-center text-xs sm:text-xs">
                       <span className="font-mono text-ink-muted">Bioindicador</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono text-accent font-medium sm:hidden">Ver detalhes</span>
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
+                                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
                       </div>
                     </div>
                   </div>
@@ -316,7 +313,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
                           e.stopPropagation();
                           playActionCardSound(card.title);
                         }}
-                        className="p-1.5 rounded-full border border-border hover:border-accent hover:text-accent text-ink-muted transition-colors shrink-0"
+                        className="min-h-11 min-w-11 flex items-center justify-center rounded-full border border-border hover:border-accent hover:text-accent text-ink-muted transition-colors shrink-0"
                         title={`Ouvir efeito sonoro de ${card.title}`}
                         aria-label={`Ouvir efeito sonoro de ${card.title}`}
                       >
@@ -334,7 +331,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
       </section>
 
       {/* --- Home Footer --- */}
-      <footer className="border-t border-border pt-12 pb-16 grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12">
+      <footer className="border-t border-border pt-12 pb-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
         <div className="col-span-1 md:col-span-2 space-y-4">
           <h4 className="text-xl font-bold font-serif italic tracking-tight">Clube de Ciências</h4>
           <p className="text-sm text-ink-secondary max-w-sm leading-relaxed">
@@ -345,20 +342,20 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
           <h5 className="label">Recursos</h5>
           <ul className="space-y-2 text-sm text-ink-secondary">
             <li><button onClick={onShowRules} className="hover:text-ink transition-colors">Manual do Jogador</button></li>
-            <li><a href="#gallery" className="hover:text-ink transition-colors">Guia de Identificação</a></li>
-            <li><a href="#about" className="hover:text-ink transition-colors">Material Didático</a></li>
+            <li><a href="#gallery" className="hover:text-ink transition-colors">Ver catálogo</a></li>
+            <li><a href="#about" className="hover:text-ink transition-colors">Sobre a ciência</a></li>
           </ul>
         </div>
         <div className="space-y-4">
           <h5 className="label">Contato</h5>
           <ul className="space-y-2 text-sm text-ink-secondary">
-            <li><a href="mailto:clubedecienciasbona@gmail.com" className="hover:text-ink transition-colors">clubedecienciasbona@gmail.com</a></li>
+            <li><a href="mailto:clubedecienciasbona@gmail.com" className="break-all hover:text-ink transition-colors">clubedecienciasbona@gmail.com</a></li>
             <li className="pt-2">
               <a
                 href="https://instagram.com/clubebona"
                 target="_blank"
                 rel="noreferrer"
-                className="btn btn-primary gap-2 h-10 px-4 text-xs"
+                className="btn btn-primary gap-2 px-4 text-xs"
                 id="btn-instagram"
               >
                 <Instagram size={14} />
@@ -369,95 +366,7 @@ export default function HomePage({ onStart, onShowRules, onGoToLeaderboard }: Ho
         </div>
       </footer>
 
-      {/* --- Card Detail Modal for Mobile / Inspection --- */}
-      <AnimatePresence>
-        {selectedCard && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-sm"
-            onClick={() => setSelectedCard(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-surface rounded-2xl max-w-sm w-full shadow-2xl border border-border overflow-hidden relative flex flex-col"
-            >
-              <div className="p-4 flex justify-between items-start border-b border-border bg-surface relative z-10">
-                <div className="min-w-0 flex-1 mr-3">
-                  <h3 className="text-xl font-bold font-serif italic leading-tight">{selectedCard.name}</h3>
-                  <div className="text-xs text-ink-muted font-mono mt-0.5">{selectedCard.group}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="score-badge text-sm w-9 h-9"
-                    style={{
-                      backgroundColor: selectedCard.color,
-                      color: shouldUseDarkText(selectedCard.color) ? '#1C1917' : '#ffffff',
-                    }}
-                  >
-                    {selectedCard.score}
-                  </div>
-                  <button
-                    onClick={() => setSelectedCard(null)}
-                    className="p-1.5 rounded-full hover:bg-surface-alt text-ink-muted hover:text-ink transition-colors"
-                    aria-label="Fechar"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className="h-56 sm:h-64 w-full relative border-b border-border overflow-hidden flex items-center justify-center p-4"
-                style={{
-                  background: `radial-gradient(circle at 50% 50%, ${selectedCard.color}30 0%, #FAFAF9 80%)`,
-                }}
-              >
-                <img
-                  src={selectedCard.image}
-                  alt={selectedCard.name}
-                  className="w-full h-full max-h-full object-contain scale-125 drop-shadow-xl z-10"
-                  referrerPolicy="no-referrer"
-                />
-                <div
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[140px] font-serif italic font-bold opacity-[0.05] pointer-events-none select-none z-0"
-                  style={{ color: selectedCard.color }}
-                >
-                  {selectedCard.score}
-                </div>
-              </div>
-
-              <div className="p-5 space-y-4 bg-surface">
-                <div>
-                  <div className="text-xs uppercase tracking-widest font-mono text-ink-muted mb-1">
-                    Descrição Científica
-                  </div>
-                  <p className="text-sm text-ink-secondary leading-relaxed font-serif italic">
-                    {selectedCard.description}
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-border flex justify-between items-center text-xs font-mono">
-                  <span className="text-ink-muted">Sensibilidade à Poluição</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold">{selectedCard.score} / 10 pts</span>
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedCard.color }} />
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setSelectedCard(null)}
-                  className="btn btn-primary w-full mt-2"
-                >
-                  Fechar
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <CardDetailModal card={selectedCard} onClose={() => setSelectedCard(null)} />
     </motion.div>
   );
 }

@@ -33,7 +33,7 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
           </div>
           <div>
             <h2 className="text-2xl font-bold italic font-serif">Ranking</h2>
-            <p className="text-[10px] text-ink-muted font-mono uppercase tracking-[0.2em]">Top Expedicionistas</p>
+            <p className="text-xs text-ink-muted font-mono uppercase tracking-widest">Top Expedicionistas</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -57,15 +57,15 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
       </div>
 
       {!leaderboardLoaded ? (
-        <div className="card p-8 text-center">
+        <div className="card p-8 text-center" role="status">
           <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-ink-muted font-mono text-sm">Carregando ranking...</p>
         </div>
       ) : leaderboardError ? (
         <div className="card p-8 text-center space-y-4" role="alert">
-          <AlertTriangle size={40} className="text-danger mx-auto opacity-80" />
+          <AlertTriangle size={40} className="text-danger-text mx-auto opacity-80" />
           <div>
-            <p className="font-semibold text-danger">Não foi possível carregar o ranking.</p>
+            <p className="font-semibold text-danger-text">Não foi possível carregar o ranking.</p>
             <p className="text-sm text-ink-muted mt-1">{leaderboardError}</p>
           </div>
           <button
@@ -109,7 +109,7 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
                   <Medal size={16} className="text-white" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-accent">Você está em #{userBestPosition}° no ranking!</div>
+                  <div className="text-sm font-bold text-accent">Você está em {userBestPosition}º lugar no ranking!</div>
                   <div className="text-xs text-ink-secondary font-mono">Melhor pontuação: {userEntries[0].entry.score} pts</div>
                 </div>
               </motion.div>
@@ -123,14 +123,14 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
                   <Trophy size={16} className="text-ink-muted" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-ink">Você ainda não jogou</div>
-                  <div className="text-xs text-ink-muted font-mono">Complete uma expedição para entrar no ranking!</div>
+                  <div className="text-sm font-bold text-ink">Você ainda não está no ranking</div>
+                  <div className="text-xs text-ink-muted font-mono">Só partidas online contam.</div>
                 </div>
               </motion.div>
             )}
 
             <div className="card overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela do ranking">
                 <table className="w-full text-left">
                   <thead className="bg-surface-alt border-b border-border">
                     <tr>
@@ -138,7 +138,7 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
                       <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Jogador</th>
                       <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Pontos</th>
                       <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Qualidade</th>
-                      <th className="px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Data</th>
+                      <th className="hidden sm:table-cell px-4 py-2.5 font-bold uppercase text-xs text-ink-secondary">Data</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -155,18 +155,16 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
                           }`}
                         >
                           <td className="px-4 py-3">
-                            <span className={`font-mono font-bold ${
-                              idx === 0 ? 'text-warning' :
-                              idx === 1 ? 'text-ink-secondary' :
-                              idx === 2 ? 'text-warning/60' :
-                              'text-ink-muted'
+                            <span className={`inline-flex items-center gap-1 font-mono font-bold ${
+                              idx === 0 ? 'text-warning' : idx === 1 ? 'text-ink-secondary' : 'text-ink-muted'
                             }`}>
-                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                              {idx < 3 && <Medal size={14} aria-hidden="true" />}
+                              {idx + 1}º
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <span className="font-serif italic font-semibold">{playerName}</span>
+                              <span className="font-serif italic font-semibold max-w-[9rem] sm:max-w-none truncate">{playerName}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3 font-mono font-bold">{entry.score}</td>
@@ -178,7 +176,7 @@ export default function LeaderboardPage({ onBack, onPlay }: LeaderboardPageProps
                               {quality.category}
                             </span>
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs text-ink-muted">
+                          <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-ink-muted">
                             {new Date(entry.played_at).toLocaleDateString('pt-BR')}
                           </td>
                         </tr>

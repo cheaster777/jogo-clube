@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useRef, createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ApiError, ApiProfile, ApiUser, apiClient, isApiConfigured, setUnauthorizedHandler, unwrapApiData } from '../lib/api';
 import { supabase, isSupabaseMode } from '../lib/supabase';
 
@@ -44,7 +44,7 @@ interface AuthContextType {
   localMode: boolean;
   authError: string | null;
   isSupabase: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null; requiresEmailVerification?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
@@ -401,8 +401,15 @@ function ApiAuthProvider({
     return () => { mounted = false; };
   }, [localMode]);
 
+  const hadSession = useRef(false);
+
+  useEffect(() => {
+    hadSession.current = Boolean(user);
+  }, [user]);
+
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      if (hadSession.current) setAuthError('Sua sessão expirou. Entre novamente.');
       setUser(null);
       setProfile(null);
       setSession(null);
@@ -425,7 +432,11 @@ function ApiAuthProvider({
     try {
       const response = await apiClient.register({ email, password, fullName });
       applyAuthResponse(response);
-      return { error: null };
+      const payload = response as { requires_email_verification?: boolean; data?: { requires_email_verification?: boolean } };
+      return {
+        error: null,
+        requiresEmailVerification: Boolean(payload.requires_email_verification ?? payload.data?.requires_email_verification),
+      };
     } catch (error) {
       return { error: toApiError(error) };
     }
@@ -445,6 +456,8 @@ function ApiAuthProvider({
     if (!localMode) {
       try {
         await apiClient.logout();
+      } catch (error) {
+        console.warn('Não foi possível encerrar a sessão no servidor:', error);
       } finally {
         setUser(null);
         setProfile(null);

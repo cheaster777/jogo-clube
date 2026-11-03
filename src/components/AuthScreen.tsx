@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 type AuthMode = 'login' | 'signup' | 'forgot' | 'verify' | 'reset';
 
 export default function AuthScreen() {
-  const { signIn, signUp, resetPassword, resendEmailVerification, confirmEmail, confirmPasswordReset } = useAuth();
+  const { authError, signIn, signUp, resetPassword, resendEmailVerification, confirmEmail, confirmPasswordReset } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -95,9 +95,11 @@ export default function AuthScreen() {
       return;
     }
 
-    const { error } = await signUp(email, password, fullName);
+    const { error, requiresEmailVerification } = await signUp(email, password, fullName);
     if (error) {
       setError(translateError(error.message));
+    } else if (requiresEmailVerification) {
+      setSuccess(`Enviamos um link para ${email}. Confirme para entrar.`);
     } else {
       setSuccess('Conta criada com sucesso! Entrando automaticamente...');
     }
@@ -217,7 +219,7 @@ export default function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+    <main className="min-h-screen bg-bg flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -226,11 +228,13 @@ export default function AuthScreen() {
         {/* Logo */}
         <div className="text-center mb-8">
           <img
-            src="/assets/images/Cópia de Logo (1).png"
-            alt="Logo Clube de Ciências"
-            className="w-20 h-20 mx-auto mb-4 rounded-xl shadow-md"
+            src="/assets/images/logo-clube.webp"
+            width={192}
+            height={192}
+            alt="Logo do Clube de Ciências Bona"
+            className="w-20 h-20 mx-auto mb-4"
           />
-          <h1 className="text-2xl font-bold font-serif italic tracking-tight">Clube de Ciências de Bona</h1>
+          <h1 className="text-2xl font-bold font-serif italic tracking-tight">Clube de Ciências Bona</h1>
           <p className="text-xs text-ink-muted font-mono uppercase tracking-widest mt-1">Bioindicadores & Impacto Ambiental</p>
         </div>
 
@@ -259,6 +263,19 @@ export default function AuthScreen() {
               </div>
 
               {/* Error/Success Messages */}
+              {authError && !error && (
+                <div className="mb-4 p-3 rounded-lg bg-danger-light border border-danger/20 text-danger-text text-sm" role="alert">
+                  <p>{authError}</p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-1 min-h-11 font-bold underline underline-offset-2"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
@@ -267,8 +284,8 @@ export default function AuthScreen() {
                   role="alert"
                   aria-live="assertive"
                 >
-                  <AlertCircle size={16} className="text-danger shrink-0 mt-0.5" />
-                  <p className="text-sm text-danger">{error}</p>
+                  <AlertCircle size={16} className="text-danger-text shrink-0 mt-0.5" />
+                  <p className="text-sm text-danger-text">{error}</p>
                 </motion.div>
               )}
 
@@ -312,7 +329,7 @@ export default function AuthScreen() {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="input-field pl-10 pr-10"
+                        className="input-field pl-10 pr-12"
                         placeholder="••••••••"
                         required
                         autoComplete="current-password"
@@ -321,7 +338,7 @@ export default function AuthScreen() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -333,7 +350,7 @@ export default function AuthScreen() {
                     <button
                       type="button"
                       onClick={() => switchMode('forgot')}
-                      className="text-xs text-accent hover:text-accent-hover transition-colors"
+                      className="min-h-11 px-1 text-xs text-accent hover:text-accent-hover transition-colors"
                     >
                       Esqueci minha senha
                     </button>
@@ -414,7 +431,7 @@ export default function AuthScreen() {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="input-field pl-10 pr-10"
+                        className="input-field pl-10 pr-12"
                         placeholder="Mínimo 8 caracteres"
                         required
                         minLength={8}
@@ -424,7 +441,7 @@ export default function AuthScreen() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -439,7 +456,7 @@ export default function AuthScreen() {
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={e => setConfirmPassword(e.target.value)}
-                        className="input-field pl-10 pr-10"
+                        className="input-field pl-10 pr-12"
                         placeholder="Repita a senha"
                         required
                         minLength={8}
@@ -449,7 +466,7 @@ export default function AuthScreen() {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
                         aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -504,7 +521,7 @@ export default function AuthScreen() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -518,7 +535,7 @@ export default function AuthScreen() {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
                         aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -580,6 +597,6 @@ export default function AuthScreen() {
           Clube de Ciências de Bona © {new Date().getFullYear()}
         </p>
       </motion.div>
-    </div>
+    </main>
   );
 }

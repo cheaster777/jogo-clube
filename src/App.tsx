@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense, lazy } from 'react';
-import { motion, AnimatePresence, MotionConfig } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Info, RotateCcw, ArrowLeft, LogOut, Droplets, AlertTriangle, ShieldCheck, Heart } from 'lucide-react';
 import type { ActionCard, FamilyCard } from './constants';
 import { useAuth } from './contexts/AuthContext';
@@ -23,7 +23,7 @@ const AboutModal = lazy(() => import('./components/AboutModal'));
 
 function PhaseFallback() {
   return (
-    <div className="min-h-[50vh] flex items-center justify-center" role="status" aria-label="Carregando tela">
+    <div className="min-h-[100dvh] flex items-center justify-center" role="status" aria-label="Carregando tela">
       <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
     </div>
   );
@@ -41,6 +41,16 @@ interface Player {
 }
 
 type GameMode = 'local' | 'server';
+
+const LOCAL_MATCH_KEY = 'clube:partida-local';
+
+function clearSavedLocalMatch() {
+  try {
+    window.sessionStorage.removeItem(LOCAL_MATCH_KEY);
+  } catch {
+    // Storage may be blocked. The match still works, it only cannot be restored.
+  }
+}
 
 export default function App() {
   const { user, profile, loading, localMode, signOut, saveGameScore, isSupabase } = useAuth();
@@ -61,7 +71,7 @@ export default function App() {
   const [gameMode, setGameMode] = useState<GameMode>('local');
   const [scoreSaved, setScoreSaved] = useState(false);
   const serverMatch = useServerMatch({
-    enabled: gameMode === 'server',
+    enabled: gameMode === 'server' && Boolean(user),
     phase,
     playerCount: numPlayers,
     playerNames,
@@ -69,9 +79,8 @@ export default function App() {
 
   const [showRules, setShowRules] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
-  // Deltas de pontuação (id do jogador -> variação) causados pela última carta
-  // de ação puxada, para deixar visível quando o efeito atinge outro jogador.
-  const [scoreDeltas, setScoreDeltas] = useState<Record<string, number>>({});
+  const matchRestored = useRef(false);
+  const inMatch = phase === 'playing' || phase === 'action';
 
   // Auto-fill player 1 name from the authenticated API profile.
   useEffect(() => {
@@ -138,7 +147,7 @@ export default function App() {
     const nextGame = createLocalGame({
       seed: String(Date.now()),
       players: Array.from({ length: numPlayers }, (_, i) => ({
-        name: botFlags[i] ? `${playerNames[i]} (BOT)` : playerNames[i],
+        name: playerNames[i],
         isBot: botFlags[i],
       })),
       maxRounds: MAX_ROUNDS,
@@ -158,28 +167,70 @@ export default function App() {
     setPhase(uiState.phase);
     setLastAction(uiState.lastAction);
     setActionMessage(uiState.actionMessage);
+
+    try {
+      if (uiState.phase === 'playing' || uiState.phase === 'action') {
+        window.sessionStorage.setItem(LOCAL_MATCH_KEY, JSON.stringify(nextGame));
+      } else {
+        window.sessionStorage.removeItem(LOCAL_MATCH_KEY);
+      }
+    } catch {
+      // Storage may be blocked. The match still works, it only cannot be restored.
+    }
   }, []);
+
+  // A reload returns to the local match in progress.
+  useEffect(() => {
+    if (matchRestored.current || loading || (!user && !localMode)) return;
+    matchRestored.current = true;
+    try {
+      const saved = window.sessionStorage.getItem(LOCAL_MATCH_KEY);
+      if (!saved) return;
+      setGameMode('local');
+      syncLocalGame(JSON.parse(saved) as LocalGameState);
+    } catch {
+      clearSavedLocalMatch();
+    }
+  }, [loading, user, localMode, syncLocalGame]);
+
+  // Each new phase and each turn of the viewer starts at the top of the page.
+  useEffect(() => {
+    if (phase === 'playing' && players[currentPlayerIndex]?.isBot) return;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, currentPlayerIndex]);
+
+  // The browser Back button must not leave the app in the middle of a match.
+  useEffect(() => {
+    if (!inMatch) return undefined;
+    window.history.pushState({ match: true }, '');
+    const handlePopState = () => {
+      if (window.confirm('Sair agora vai descartar a expedição atual. Continuar?')) {
+        clearSavedLocalMatch();
+        serverMatch.reset();
+        setPhase('home');
+      } else {
+        window.history.pushState({ match: true }, '');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inMatch]);
+
+  // Online matches cannot be restored yet, so warn before the page closes.
+  useEffect(() => {
+    if (!inMatch || gameMode !== 'server') return undefined;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [inMatch, gameMode]);
 
   const runLocalCommand = useCallback((command: 'DRAW_ACTION' | 'END_TURN') => {
     if (!localGame) return;
 
     try {
-      const prevScoresById: Record<string, number> = {};
-      localGame.players.forEach(p => { prevScoresById[String(p.id)] = p.score; });
-      const nextGame = dispatchLocalCommand(localGame, { type: command });
-
-      if (command === 'DRAW_ACTION') {
-        const deltas: Record<string, number> = {};
-        nextGame.players.forEach(p => {
-          const prev: number = prevScoresById[String(p.id)] ?? p.score;
-          if (p.score !== prev) deltas[String(p.id)] = p.score - prev;
-        });
-        setScoreDeltas(deltas);
-      } else {
-        setScoreDeltas({});
-      }
-
-      syncLocalGame(nextGame);
+      syncLocalGame(dispatchLocalCommand(localGame, { type: command }));
     } catch (error) {
       console.error('Falha ao executar comando local:', error);
     }
@@ -246,20 +297,32 @@ export default function App() {
     });
   }, [phase, user, scoreSaved, players, isSupabase, saveGameScore]);
 
-  const handPlayerIndex = gameMode === 'server' && (serverMatch.state?.viewerSeat ?? -1) >= 0
-    ? serverMatch.state?.viewerSeat ?? -1
-    : currentPlayerIndex;
+  const viewerSeat = serverMatch.state?.viewerSeat ?? -1;
+  // Bots have no screen: during their turn the viewer keeps seeing their own hand.
+  const firstHumanIndex = Math.max(players.findIndex(player => !player.isBot), 0);
+  const handPlayerIndex = gameMode === 'server' && viewerSeat >= 0
+    ? viewerSeat
+    : players[currentPlayerIndex]?.isBot ? firstHumanIndex : currentPlayerIndex;
 
   const requestReset = useCallback((targetPhase: GamePhase) => {
-    const isDestructive = phase === 'playing' || phase === 'action' || phase === 'gameOver';
-    if (isDestructive && !window.confirm('Reiniciar vai descartar a expedição atual. Continuar?')) {
+    if (inMatch && !window.confirm('Reiniciar vai descartar a expedição atual. Continuar?')) {
       return;
     }
+    clearSavedLocalMatch();
     serverMatch.reset();
     setPhase(targetPhase);
-  }, [phase, serverMatch]);
+  }, [inMatch, serverMatch]);
+
+  const leaveFinishedMatch = useCallback((targetPhase: GamePhase) => {
+    serverMatch.reset();
+    setPhase(targetPhase);
+  }, [serverMatch]);
 
   const handleSignOut = useCallback(async () => {
+    if (inMatch && !window.confirm('Sair da conta vai descartar a expedição atual. Continuar?')) {
+      return;
+    }
+    clearSavedLocalMatch();
     serverMatch.reset();
     setPlayers([]);
     setCurrentPlayerIndex(0);
@@ -268,10 +331,9 @@ export default function App() {
     setPhase('home');
     setLastAction(null);
     setActionMessage('');
-    setScoreDeltas({});
     setLocalGame(null);
     await signOut();
-  }, [serverMatch, signOut]);
+  }, [inMatch, serverMatch, signOut]);
 
   const serverMatchForBoard = useMemo(() => ({
     loading: serverMatch.loading,
@@ -292,7 +354,7 @@ export default function App() {
     );
   }
 
-  const installPrompt = <InstallPrompt paused={phase === 'playing' || phase === 'action'} />;
+  const installPrompt = <InstallPrompt paused={inMatch} />;
 
   if (!user && !localMode) {
     return (
@@ -306,31 +368,31 @@ export default function App() {
   const showStatBar = phase !== 'setup' && phase !== 'home' && phase !== 'leaderboard' && phase !== 'gameOver';
 
   return (
-    <MotionConfig reducedMotion="user">
     <div className="min-h-screen bg-bg text-ink font-sans selection:bg-accent selection:text-white">
       {/* ==================== HEADER ==================== */}
-      <header className="min-w-0 border-b border-border bg-surface/80 backdrop-blur-md p-4 md:p-6 flex justify-between items-center gap-3 sticky top-0 z-50">
+      <header className="min-w-0 border-b border-border bg-surface/80 backdrop-blur-md px-4 py-2 md:p-6 flex justify-between items-center gap-3 sticky top-0 z-50">
         <button
           type="button"
           className="min-w-0 flex-1 flex items-center gap-3 text-left"
           onClick={() => requestReset('home')}
+          aria-label="Clube de Ciências Bona, voltar ao início"
         >
-          <div className="relative w-16 md:w-24 h-16 flex items-center shrink-0">
-            <img
-              src="/assets/images/Cópia de Logo (1).png"
-              alt="Logo Clube de Ciências"
-              className="absolute left-0 rounded-lg scale-[1.1] md:scale-[1.35] origin-left drop-shadow-md z-10"
-            />
-          </div>
-          <div>
-            <h1 className="max-w-[150px] md:max-w-none truncate text-base md:text-xl font-bold tracking-tight font-serif italic">Clube de Ciências de Bona</h1>
+          <img
+            src="/assets/images/logo-clube.webp"
+            width={192}
+            height={192}
+            alt=""
+            className="h-11 w-11 md:h-14 md:w-14 shrink-0"
+          />
+          <div className="min-w-0 hidden min-[420px]:block">
+            <h1 className="truncate text-base md:text-xl font-bold tracking-tight font-serif italic">Clube de Ciências Bona</h1>
             <p className="text-xs text-ink-muted font-mono uppercase tracking-widest hidden sm:block">Bioindicadores & Impacto Ambiental</p>
           </div>
         </button>
         <div className="shrink-0 flex gap-1.5 md:gap-4 items-center">
           <a
             href="https://clubedecienciasbona.com.br/"
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border-strong text-xs font-bold text-ink-secondary hover:bg-surface-alt hover:text-ink transition-all"
+            className="hidden md:flex items-center gap-2 min-h-11 px-3 rounded-lg border border-border-strong text-xs font-bold text-ink-secondary hover:bg-surface-alt hover:text-ink transition-all"
             target="_blank"
             rel="noopener noreferrer"
             title="Volte para o site principal"
@@ -375,14 +437,14 @@ export default function App() {
             </button>
           )}
           {/* User info + Logout */}
-          <div className="flex items-center gap-2 border-l border-border pl-3 ml-1">
+          <div className={`${inMatch ? 'hidden md:flex' : 'flex'} items-center gap-2 border-l border-border pl-3 ml-1`}>
               <div className="hidden md:block text-right">
                 <div className="text-xs font-bold font-serif italic leading-tight truncate max-w-[120px]">{profile?.full_name}</div>
               <div className="text-xs text-ink-muted font-mono truncate max-w-[120px]">{user?.email || 'Modo local'}</div>
             </div>
             <button
               onClick={() => void handleSignOut()}
-              className="min-w-[44px] min-h-[44px] p-3 hover:bg-danger-light rounded-lg transition-all text-ink-secondary hover:text-danger"
+              className="min-w-[44px] min-h-[44px] p-3 hover:bg-danger-light rounded-lg transition-all text-ink-secondary hover:text-danger-text"
               title="Sair da conta"
               aria-label="Sair da conta"
               id="btn-logout"
@@ -393,7 +455,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-4 md:p-6">
+      <main className={`max-w-7xl mx-auto p-4 md:p-6 ${inMatch ? 'pb-[calc(6rem+env(safe-area-inset-bottom))]' : ''}`}>
         <Suspense fallback={<PhaseFallback />}>
           <AnimatePresence mode="wait">
 
@@ -433,7 +495,10 @@ export default function App() {
                 handPlayerIndex={handPlayerIndex}
                 lastAction={lastAction}
                 actionMessage={actionMessage}
-                scoreDeltas={scoreDeltas}
+                currentRound={currentRound}
+                maxRounds={MAX_ROUNDS}
+                familyDeckCount={familyDeck.length}
+                actionDeckCount={actionDeck.length}
                 gameMode={gameMode}
                 serverMatch={serverMatchForBoard}
                 onDrawAction={drawAction}
@@ -444,11 +509,12 @@ export default function App() {
             {phase === 'gameOver' && (
               <GameOverPage
                 players={players}
+                viewerIndex={gameMode === 'server' ? viewerSeat : firstHumanIndex}
                 gameMode={gameMode}
                 onShowRules={() => setShowRules(true)}
-                onViewRanking={() => setPhase('leaderboard')}
-                onNewGame={() => setPhase('setup')}
-                onGoHome={() => setPhase('home')}
+                onViewRanking={() => leaveFinishedMatch('leaderboard')}
+                onNewGame={() => leaveFinishedMatch('setup')}
+                onGoHome={() => leaveFinishedMatch('home')}
               />
             )}
 
@@ -474,6 +540,7 @@ export default function App() {
       <Suspense fallback={null}>
         <AboutModal open={showAbout} onClose={() => setShowAbout(false)} />
       </Suspense>
+      {!inMatch && (
       <motion.button
         onClick={() => setShowAbout(true)}
         className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-accent text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all"
@@ -485,9 +552,11 @@ export default function App() {
       >
         <Heart size={24} />
       </motion.button>
+      )}
 
       {/* ==================== GLOBAL FOOTER ==================== */}
-      <footer className="mt-16 md:mt-20 border-t border-border p-8 md:p-12 bg-surface/50">
+      {!inMatch && (
+      <footer className="pb-24 md:pb-12 mt-16 md:mt-20 border-t border-border p-8 md:p-12 bg-surface/50">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
           <div className="space-y-4">
             <div className="label font-bold">Sobre o Jogo</div>
@@ -499,7 +568,7 @@ export default function App() {
             <div className="label font-bold">Mecânicas</div>
             <ul className="text-sm space-y-2 text-ink-secondary">
               <li className="flex items-center gap-2"><Droplets size={12} className="text-accent shrink-0" /> Pontuação baseada em sensibilidade (1-10)</li>
-              <li className="flex items-center gap-2"><AlertTriangle size={12} className="text-danger shrink-0" /> Cartas de Impacto removem bioindicadores</li>
+              <li className="flex items-center gap-2"><AlertTriangle size={12} className="text-danger-text shrink-0" /> Cartas de Impacto removem bioindicadores</li>
               <li className="flex items-center gap-2"><ShieldCheck size={12} className="text-success shrink-0" /> Cartas de Mitigação recuperam o ecossistema</li>
             </ul>
           </div>
@@ -540,7 +609,7 @@ export default function App() {
           <p className="text-xs uppercase tracking-widest text-ink-muted font-mono">Desenvolvido por Victor Gabriel para o projeto de clube bona</p>
         </div>
       </footer>
+      )}
     </div>
-    </MotionConfig>
   );
 }

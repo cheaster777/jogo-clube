@@ -139,7 +139,7 @@ export default function RulesModal({ open, onClose }: RulesModalProps) {
 
               <section>
                 <h3 className="label font-bold mb-3">Qualidade da Água (BMWP)</h3>
-                <div className="card overflow-x-auto">
+                <div className="card overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela de qualidade da água">
                   <table className="w-full min-w-[360px] text-xs text-left">
                     <thead>
                       <tr className="border-b border-border bg-surface-alt">

@@ -1,4 +1,4 @@
-import { Info, Play, Users } from 'lucide-react';
+import { Play, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export type SetupGameMode = 'local' | 'server';
@@ -44,9 +44,9 @@ export default function SetupPanel({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="max-w-md mx-auto mt-12 md:mt-20"
+      className="max-w-md mx-auto md:mt-12"
     >
-      <div className="card p-6 md:p-8 shadow-lg" id="setup-panel">
+      <div className="card p-4 md:p-8 shadow-lg" id="setup-panel">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-accent-light rounded-lg flex items-center justify-center">
             <Users size={20} className="text-accent" />
@@ -54,7 +54,7 @@ export default function SetupPanel({
           <h2 className="text-xl font-bold italic font-serif">Configuração do Jogo</h2>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5 md:space-y-6">
           <fieldset>
             <legend className="label block mb-3">Modo da partida</legend>
             <div className="grid grid-cols-2 gap-2">
@@ -62,22 +62,22 @@ export default function SetupPanel({
                 type="button"
                 onClick={() => onGameModeChange('local')}
                 aria-pressed={gameMode === 'local'}
-                className={`py-3 rounded-lg font-mono text-xs font-semibold uppercase transition-all border ${
+                className={`min-h-11 py-3 rounded-lg font-mono text-xs font-semibold uppercase transition-all border ${
                   gameMode === 'local' ? 'bg-ink text-white border-ink shadow-sm' : 'border-border-strong hover:bg-surface-alt text-ink-secondary'
                 }`}
               >
-                Local contra bots
+                Contra bots
               </button>
               <button
                 type="button"
                 onClick={() => onGameModeChange('server')}
                 disabled={!apiConfigured}
                 aria-pressed={gameMode === 'server'}
-                className={`py-3 rounded-lg font-mono text-xs font-semibold uppercase transition-all border disabled:cursor-not-allowed disabled:opacity-40 ${
+                className={`min-h-11 py-3 rounded-lg font-mono text-xs font-semibold uppercase transition-all border disabled:cursor-not-allowed disabled:opacity-40 ${
                   gameMode === 'server' ? 'bg-accent text-white border-accent shadow-sm' : 'border-border-strong hover:bg-surface-alt text-ink-secondary'
                 }`}
               >
-                API validada
+                Online com ranking
               </button>
             </div>
             {!apiConfigured && <p className="text-xs text-ink-muted mt-2">Partidas com ranking oficial estarão disponíveis em breve.</p>}
@@ -105,21 +105,22 @@ export default function SetupPanel({
 
           <fieldset>
             <legend className="label block mb-3">Configurar jogadores</legend>
-            <div className="space-y-3 mb-6">
+            <div className="space-y-3">
               {playerNames.map((name, index) => (
                 <div key={index} className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center text-xs font-mono font-bold shrink-0">
                     {index + 1}
                   </div>
-                  <div className="flex-grow flex gap-2">
+                  <div className="flex-grow flex gap-2 min-w-0">
                     <label htmlFor={`input-player-${index}`} className="sr-only">Nome do jogador {index + 1}</label>
                     <input
                       type="text"
                       value={name}
                       onChange={event => onPlayerNameChange(index, event.target.value)}
-                      className="input-field flex-grow font-serif italic"
+                      className="input-field flex-grow min-w-0 font-serif italic"
                       placeholder={`Nome do Jogador ${index + 1}`}
                       id={`input-player-${index}`}
+                      maxLength={40}
                     />
                     <button
                       type="button"
@@ -127,14 +128,14 @@ export default function SetupPanel({
                       disabled={gameMode === 'server'}
                       aria-pressed={botFlags[index]}
                       aria-label={`Jogador ${index + 1}: ${botFlags[index] ? 'bot' : 'humano'}`}
-                      className={`px-3 rounded-lg text-xs font-mono font-semibold uppercase tracking-tight transition-all border ${
+                      className={`min-h-11 px-3 rounded-lg text-xs font-mono font-semibold uppercase tracking-tight transition-all border ${
                         gameMode === 'server'
                           ? 'bg-surface-alt text-ink-muted border-border-strong cursor-not-allowed'
                           : botFlags[index] ? 'bg-accent text-white border-accent' : 'bg-surface text-ink-muted border-border-strong'
                       }`}
                       id={`btn-bot-${index}`}
                     >
-                      {gameMode === 'server' ? 'Humano' : botFlags[index] ? 'BOT' : 'Humano'}
+                      {gameMode === 'server' ? 'Humano' : botFlags[index] ? 'Bot' : 'Humano'}
                     </button>
                   </div>
                 </div>
@@ -142,20 +143,8 @@ export default function SetupPanel({
             </div>
           </fieldset>
 
-          <div className="p-4 bg-accent-light/50 border border-accent/20 rounded-lg text-sm leading-relaxed">
-            <div className="flex gap-2 mb-2 font-bold text-accent uppercase tracking-tight text-xs">
-              <Info size={14} /> Regras Rápidas
-            </div>
-            <ul className="list-disc list-inside space-y-1 text-ink-secondary text-sm">
-              <li>Cada jogador começa com 7 cartas de família.</li>
-              <li>A partida dura exatamente <strong>5 rodadas</strong>.</li>
-              <li>Na sua vez, você DEVE puxar uma carta de ação.</li>
-              <li>O vencedor é quem tiver mais pontos após as 5 rodadas.</li>
-            </ul>
-          </div>
-
           {serverError && (
-            <div className="p-3 rounded-lg bg-danger-light border border-danger/20 text-danger text-sm" role="alert">
+            <div className="p-3 rounded-lg bg-danger-light border border-danger/20 text-danger-text text-sm" role="alert">
               {serverError}
             </div>
           )}
@@ -166,7 +155,7 @@ export default function SetupPanel({
               <input
                 value={joinMatchId}
                 onChange={event => onJoinMatchIdChange(event.target.value)}
-                className="input-field w-full font-mono text-xs"
+                className="input-field w-full font-mono"
                 placeholder="Cole o código da sala"
                 aria-label="Código da sala"
               />
@@ -179,7 +168,7 @@ export default function SetupPanel({
           <button
             onClick={onStart}
             disabled={serverLoading}
-            className="btn btn-primary btn-lg w-full gap-2"
+            className="btn btn-accent btn-lg w-full gap-2"
             id="btn-init-game"
           >
             <Play size={18} fill="currentColor" /> {serverLoading ? 'Conectando...' : 'Iniciar Expedição'}

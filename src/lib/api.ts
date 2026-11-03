@@ -82,8 +82,9 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
   timeoutMs?: number;
 };
 
+// Only JSON bodies carry messages written for the player. Text bodies come from
+// proxies, such as an HTML error page, and must never reach the screen.
 function getErrorMessage(payload: unknown, fallback: string): string {
-  if (typeof payload === 'string' && payload.trim()) return payload;
   if (payload && typeof payload === 'object') {
     const value = payload as Record<string, unknown>;
     if (typeof value.message === 'string') return value.message;
@@ -134,7 +135,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         ? 'Sua sessão expirou. Entre novamente.'
         : response.status === 429
           ? 'Muitas tentativas. Aguarde um momento.'
-          : 'Não foi possível concluir a solicitação.';
+          : response.status >= 500
+            ? 'O servidor está indisponível. Tente novamente em instantes.'
+            : 'Não foi possível concluir a solicitação.';
       const errorPayload = payload && typeof payload === 'object' ? payload as Record<string, unknown> : undefined;
       const nestedError = errorPayload?.error && typeof errorPayload.error === 'object'
         ? errorPayload.error as Record<string, unknown>
@@ -156,7 +159,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new ApiError('A solicitação demorou demais. Tente novamente.', 408, 'TIMEOUT');
     }
-    throw new ApiError('Não foi possível conectar à API. Verifique sua conexão.', 0, 'NETWORK_ERROR', error);
+    throw new ApiError('Não foi possível conectar. Verifique sua internet.', 0, 'NETWORK_ERROR', error);
   } finally {
     window.clearTimeout(timeout);
   }

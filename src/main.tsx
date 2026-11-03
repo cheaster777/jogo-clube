@@ -1,5 +1,6 @@
 /// <reference types="vite-plugin-pwa/client" />
 import { createRoot } from 'react-dom/client';
+import { MotionConfig } from 'motion/react';
 import { registerSW } from 'virtual:pwa-register';
 import { AuthProvider } from './contexts/AuthContext';
 import App from './App.tsx';
@@ -16,7 +17,9 @@ if (!isNativeApp()) {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <AuthProvider>
-    <App />
-  </AuthProvider>
+  <MotionConfig reducedMotion="user">
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </MotionConfig>
 );
