@@ -47,8 +47,8 @@ redireciona para a raiz, e o container responde em `GET /health`.
 Para publicar uma versão:
 
 1. Troque o SHA no `build.context` do serviço `site` e execute o deploy.
-2. Ao alterar `site/public/css/site.css`, aumente o `?v=` nas três páginas. O CSS
-   fica em cache por 7 dias.
+2. Ao alterar `site/public/css/site.css` ou substituir uma imagem mantendo o nome,
+   aumente o `?v=` da URL nas três páginas. Esses arquivos ficam em cache por 7 dias.
 
 O túnel encaminha o site por `/home/hermes/clubeciencia-migracao-private/cloudflare-tunnel.yml`
 na VPS. Um hostname novo exige reiniciar o container `cloudflared` e criar um CNAME

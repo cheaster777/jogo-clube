@@ -285,7 +285,7 @@ svg.icon {
   top: 0;
   z-index: 50;
   border-bottom: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
 }
 
 .site-header .wrap {
@@ -309,9 +309,9 @@ svg.icon {
 }
 
 .brand img {
-  width: 56px;
+  flex: none;
+  width: 48px;
   height: 48px;
-  object-fit: contain;
 }
 
 .brand strong {
@@ -384,7 +384,7 @@ svg.icon {
 
   .site-nav {
     order: 3;
-    flex-basis: 100%;
+    flex-basis: calc(100% + 12px);
     margin-inline: -6px;
   }
 
@@ -400,6 +400,10 @@ svg.icon {
 }
 
 @media (max-width: 520px) {
+  .site-header .wrap {
+    column-gap: 12px;
+  }
+
   .brand {
     gap: 8px;
     flex: 1 1 0;
@@ -411,6 +415,7 @@ svg.icon {
 
   .brand img {
     width: 44px;
+    height: 44px;
   }
 
   .brand strong {
@@ -419,6 +424,19 @@ svg.icon {
 
   .site-header .btn {
     padding: 0 14px;
+  }
+}
+
+@media (max-width: 350px) {
+  .site-nav a {
+    padding: 0 4px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 920px) and (max-width: 1023px) {
+  .brand small {
+    display: none;
   }
 }
 
@@ -518,9 +536,9 @@ svg.icon {
 
 .hero-photo img {
   width: 100%;
-  aspect-ratio: 1 / 1.08;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
-  object-position: 50% 74%;
+  object-position: 50% 100%;
   border-radius: var(--radius-lg);
 }
 
@@ -562,7 +580,7 @@ svg.icon {
   }
 
   .hero h1 {
-    font-size: clamp(2rem, 10vw, 4.5rem);
+    font-size: clamp(2rem, 10vw, 4rem);
   }
 
   .hero-stage {
@@ -613,6 +631,37 @@ svg.icon {
 .s-1 {
   --score: var(--score-1);
   --score-ink: #ffffff;
+}
+
+@media (min-width: 920px) {
+  .hero .wrap {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 48px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.25rem, 4.2vw, 3.6rem);
+  }
+
+  .hero-card {
+    left: -28px;
+    width: 172px;
+  }
+}
+
+@media (max-width: 520px) {
+  .hero {
+    padding-block-start: 28px;
+  }
+
+  .hero-actions {
+    margin-top: 24px;
+  }
+
+  .hero-actions .btn {
+    flex: 1 1 auto;
+    padding-inline: 16px;
+  }
 }
 
 /* Family card, matching the game's card */
@@ -763,6 +812,16 @@ svg.icon {
   box-shadow: var(--shadow-md);
 }
 
+@media (min-width: 860px) {
+  .about-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .about-photo {
+    order: -1;
+  }
+}
+
 @media (max-width: 859px) {
   .about-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -863,7 +922,23 @@ svg.icon {
 
 @media (max-width: 520px) {
   .group-cards {
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    gap: 12px;
+    margin-inline: calc(-1 * var(--gutter));
+    padding: 4px var(--gutter) 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+
+  .group-cards::-webkit-scrollbar {
+    display: none;
+  }
+
+  .group-cards .family-card {
+    flex: 0 0 min(80%, 300px);
+    scroll-snap-align: start;
   }
 
   .card-art {
@@ -877,6 +952,11 @@ svg.icon {
 }
 
 /* Ecological importance */
+#importancia {
+  background: var(--color-accent-hover);
+  color: #ffffff;
+}
+
 .importance-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -891,14 +971,14 @@ svg.icon {
 }
 
 .importance-list h3 {
-  font-size: var(--text-xl);
+  font-size: var(--text-2xl);
 }
 
 .importance-list p {
   max-width: 44ch;
   margin-top: 8px;
   font-size: var(--text-base);
-  color: var(--color-ink-secondary);
+  color: var(--color-accent-light);
 }
 
 @media (max-width: 719px) {
@@ -927,6 +1007,10 @@ svg.icon {
   border-radius: var(--radius-lg);
 }
 
+.gallery-more {
+  margin-top: 32px;
+}
+
 figcaption {
   margin-top: 8px;
   font-size: var(--text-sm);
@@ -948,6 +1032,30 @@ figcaption strong {
   .gallery-grid img {
     height: auto;
     aspect-ratio: 4 / 3;
+  }
+}
+
+/* Persistent path to the game on phones */
+.dock {
+  display: none;
+}
+
+@media (max-width: 919px) {
+  .dock {
+    position: sticky;
+    bottom: 16px;
+    z-index: 40;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    height: 0;
+    padding-inline: var(--gutter);
+    pointer-events: none;
+  }
+
+  .dock .btn {
+    pointer-events: auto;
+    box-shadow: var(--shadow-lg);
   }
 }
 
@@ -1006,15 +1114,57 @@ figcaption strong {
   }
 }
 
+.play-with-photo .wrap {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(32px, 6vw, 72px);
+  padding-block: clamp(56px, 6vw, 72px);
+}
+
+.play-with-photo .btn {
+  margin-top: 28px;
+}
+
+.play-photo {
+  margin-block: -120px 0;
+  padding: 10px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  transform: rotate(-2deg);
+}
+
+.play-photo img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  object-position: 50% 42%;
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 719px) {
+  .play-with-photo .wrap {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .play-photo {
+    order: -1;
+    margin-block: 0;
+  }
+}
+
 /* Footer */
 .site-footer {
   padding-block: 48px 40px;
   border-top: 1px solid var(--color-border);
 }
 
+main:has(.play) + .site-footer {
+  border-top: 0;
+}
+
 .footer-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 32px 48px;
 }
 
@@ -1045,10 +1195,10 @@ figcaption strong {
 }
 
 .footer-list a {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
+  min-height: 44px;
   font-size: var(--text-sm);
   color: var(--color-ink-secondary);
   text-decoration: none;
@@ -1076,15 +1226,20 @@ figcaption strong {
   .footer-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .footer-grid > div:nth-child(2) .footer-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* Study page */
 .study-hero {
-  padding-block: clamp(40px, 6vw, 72px) 0;
+  padding-block: clamp(32px, 4vw, 48px) 0;
 }
 
 .study-hero h1 {
-  font-size: clamp(2rem, 10vw, 4.5rem);
+  font-size: clamp(2rem, 10vw, 4rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 0.98;
@@ -1101,7 +1256,7 @@ figcaption strong {
 }
 
 .study-cover {
-  margin-top: clamp(32px, 5vw, 56px);
+  margin-top: clamp(24px, 3vw, 32px);
 }
 
 .study-cover img {
@@ -1111,6 +1266,14 @@ figcaption strong {
   object-position: 50% 62%;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
+}
+
+@media (min-width: 860px) {
+  .study-cover img {
+    height: clamp(220px, 52svh, 478px);
+    aspect-ratio: auto;
+    object-position: 50% 78%;
+  }
 }
 
 .study-layout {
@@ -1134,7 +1297,7 @@ figcaption strong {
 .study-toc a {
   display: flex;
   align-items: center;
-  min-height: 40px;
+  min-height: 44px;
   padding-left: 16px;
   font-size: var(--text-sm);
   font-weight: 600;
@@ -1156,12 +1319,25 @@ figcaption strong {
   letter-spacing: -0.03em;
 }
 
+.study-section .prose {
+  max-width: 40rem;
+  color: var(--color-ink);
+  font-size: clamp(1rem, 0.95rem + 0.35vw, 1.125rem);
+  line-height: 1.7;
+}
+
+.study-section .scale {
+  max-width: 40rem;
+  margin-top: 28px;
+}
+
 .study-section h3 {
   margin: 32px 0 12px;
   font-size: var(--text-2xl);
 }
 
 .study-figure {
+  max-width: 40rem;
   margin-top: 28px;
 }
 
@@ -1174,7 +1350,7 @@ figcaption strong {
 .study-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
   margin-top: 28px;
 }
 
@@ -1221,17 +1397,37 @@ figcaption strong {
 
 @media (max-width: 480px) {
   .study-pair {
-    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .study-pair figcaption {
+    font-size: var(--text-xs);
   }
 }
 
 /* Not found page */
 .not-found {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
-  padding-block: clamp(72px, 14vw, 160px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 48px;
+  align-items: center;
+  padding-block: clamp(72px, 12vw, 140px);
+}
+
+.not-found .hero-card {
+  position: static;
+  width: 188px;
+  animation: none;
+}
+
+@media (max-width: 719px) {
+  .not-found {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .not-found .hero-card {
+    display: none;
+  }
 }
 
 .not-found h1 {
@@ -1240,8 +1436,9 @@ figcaption strong {
   letter-spacing: -0.03em;
 }
 
-.not-found p {
+.not-found > div:first-child > p {
   max-width: 48ch;
+  margin-top: 16px;
   color: var(--color-ink-secondary);
 }
 
@@ -1262,6 +1459,7 @@ figcaption strong {
 @media print {
   .site-header,
   .play,
+  .dock,
   .study-toc {
     display: none;
   }
