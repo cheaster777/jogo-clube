@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'verify' | 'reset';
 
-export default function AuthScreen() {
-  const { authError, signIn, signUp, resetPassword, resendEmailVerification, confirmEmail, confirmPasswordReset } = useAuth();
+export default function AuthScreen({ onComplete }: { onComplete?: () => void }) {
+  const { user, authError, signIn, signUp, resetPassword, resendEmailVerification, confirmEmail, confirmPasswordReset } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,6 +65,8 @@ export default function AuthScreen() {
     if (error) {
       setError(translateError(error.message));
       setNeedsVerification(error.message.toLowerCase().includes('não confirmado'));
+    } else {
+      onComplete?.();
     }
     setLoading(false);
   };
@@ -252,7 +254,10 @@ export default function AuthScreen() {
               <div className="mb-6">
                 {mode !== 'login' && (
                   <button
-                    onClick={() => switchMode('login')}
+                    onClick={() => {
+                      onComplete?.();
+                      switchMode('login');
+                    }}
                     className="flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink transition-colors mb-4"
                   >
                     <ArrowLeft size={14} /> Voltar ao login
@@ -581,10 +586,13 @@ export default function AuthScreen() {
               {success && (
                 <div className="text-center pt-2">
                   <button
-                    onClick={() => switchMode('login')}
+                    onClick={() => {
+                      onComplete?.();
+                      switchMode('login');
+                    }}
                     className="btn btn-secondary"
                   >
-                    Ir para Login
+                    {user ? 'Voltar ao jogo' : 'Ir para Login'}
                   </button>
                 </div>
               )}

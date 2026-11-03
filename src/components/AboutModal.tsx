@@ -9,12 +9,12 @@ interface AboutModalProps {
 
 const CLUB_PHOTOS = [
   {
-    src: '/assets/images/clube-foto-1.jpg',
+    src: '/assets/images/clube-foto-1.webp',
     alt: 'Membros do Clube de Ciências Bona no Setor de Ciências Biológicas',
     caption: 'Visita ao Setor de Ciências Biológicas',
   },
   {
-    src: '/assets/images/clube-foto-2.jpg',
+    src: '/assets/images/clube-foto-2.webp',
     alt: 'Alunos do Clube de Ciências Bona em encontro na escola',
     caption: 'Encontro do Clube no Colégio Theodoro de Bona',
   },

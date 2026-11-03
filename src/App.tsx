@@ -5,9 +5,7 @@ import type { ActionCard, FamilyCard } from './constants';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import InstallPrompt from './components/InstallPrompt';
-import { isApiConfigured } from './lib/api';
-import { getWaterQuality } from './lib/cardDisplay';
-import { isSupabaseMode } from './lib/supabase';
+import { ApiError, isApiConfigured } from './lib/api';
 import { createLocalGame, dispatchLocalCommand, getLocalUiState, LocalGameState } from './game/localAdapter';
 import { useServerMatch } from './hooks/useServerMatch';
 
@@ -43,6 +41,13 @@ interface Player {
 type GameMode = 'local' | 'server';
 
 const LOCAL_MATCH_KEY = 'clube:partida-local';
+const serverMatchKey = (userId: string) => `clube:partida-online:${userId}`;
+
+function hasEmailAction() {
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  return Boolean(query.get('verify') || query.get('reset') || hash.get('verify') || hash.get('reset'));
+}
 
 function clearSavedLocalMatch() {
   try {
@@ -53,7 +58,7 @@ function clearSavedLocalMatch() {
 }
 
 export default function App() {
-  const { user, profile, loading, localMode, signOut, saveGameScore, isSupabase } = useAuth();
+  const { user, profile, loading, localMode, signOut } = useAuth();
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
@@ -69,7 +74,7 @@ export default function App() {
   const MAX_ROUNDS = 5;
   const [localGame, setLocalGame] = useState<LocalGameState | null>(null);
   const [gameMode, setGameMode] = useState<GameMode>('local');
-  const [scoreSaved, setScoreSaved] = useState(false);
+  const [emailAction, setEmailAction] = useState(hasEmailAction);
   const serverMatch = useServerMatch({
     enabled: gameMode === 'server' && Boolean(user),
     phase,
@@ -79,8 +84,14 @@ export default function App() {
 
   const [showRules, setShowRules] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
-  const matchRestored = useRef(false);
+  const matchRestored = useRef<string | null>(null);
   const inMatch = phase === 'playing' || phase === 'action';
+  const clearSavedMatch = useCallback(() => {
+    clearSavedLocalMatch();
+    try {
+      if (user) window.sessionStorage.removeItem(serverMatchKey(user.id));
+    } catch { /* Storage may be blocked. */ }
+  }, [user?.id]);
 
   // Auto-fill player 1 name from the authenticated API profile.
   useEffect(() => {
@@ -138,7 +149,6 @@ export default function App() {
 
   // Initialize Game
   const initGame = async () => {
-    setScoreSaved(false);
     if (gameMode === 'server') {
       await serverMatch.start();
       return;
@@ -179,11 +189,31 @@ export default function App() {
     }
   }, []);
 
-  // A reload returns to the local match in progress.
+  // A reload resumes the authenticated user's server match from its latest
+  // authoritative snapshot. Only its ID is persisted, never private game state.
   useEffect(() => {
-    if (matchRestored.current || loading || (!user && !localMode)) return;
-    matchRestored.current = true;
+    if (loading) return;
+    if (!user && !localMode) {
+      matchRestored.current = null;
+      setPhase('home');
+      return;
+    }
+    const owner = user?.id ?? 'local';
+    if (matchRestored.current === owner) return;
+    if (emailAction) return;
+    matchRestored.current = owner;
     try {
+      const onlineId = user && window.sessionStorage.getItem(serverMatchKey(user.id));
+      if (onlineId) {
+        setGameMode('server');
+        setPhase('setup');
+        void serverMatch.resume(onlineId).catch(error => {
+          if (error instanceof ApiError && [403, 404].includes(error.status)) {
+            try { window.sessionStorage.removeItem(serverMatchKey(user.id)); } catch { /* Storage may be blocked. */ }
+          }
+        });
+        return;
+      }
       const saved = window.sessionStorage.getItem(LOCAL_MATCH_KEY);
       if (!saved) return;
       setGameMode('local');
@@ -191,7 +221,19 @@ export default function App() {
     } catch {
       clearSavedLocalMatch();
     }
-  }, [loading, user, localMode, syncLocalGame]);
+  }, [loading, user, localMode, syncLocalGame, emailAction, serverMatch.resume]);
+
+  useEffect(() => {
+    if (!user || gameMode !== 'server' || !serverMatch.matchId || !serverMatch.state) return;
+    try {
+      const key = serverMatchKey(user.id);
+      if (serverMatch.state.phase === 'gameOver') window.sessionStorage.removeItem(key);
+      else {
+        window.sessionStorage.setItem(key, serverMatch.matchId);
+        clearSavedLocalMatch();
+      }
+    } catch { /* Storage may be blocked. */ }
+  }, [user?.id, gameMode, serverMatch.matchId, serverMatch.state]);
 
   // Each new phase and each turn of the viewer starts at the top of the page.
   useEffect(() => {
@@ -206,7 +248,7 @@ export default function App() {
     window.history.pushState({ match: true }, '');
     const handlePopState = () => {
       if (window.confirm('Sair agora vai descartar a expedição atual. Continuar?')) {
-        clearSavedLocalMatch();
+        clearSavedMatch();
         serverMatch.reset();
         setPhase('home');
       } else {
@@ -217,14 +259,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inMatch]);
-
-  // Online matches cannot be restored yet, so warn before the page closes.
-  useEffect(() => {
-    if (!inMatch || gameMode !== 'server') return undefined;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [inMatch, gameMode]);
 
   const runLocalCommand = useCallback((command: 'DRAW_ACTION' | 'END_TURN') => {
     if (!localGame) return;
@@ -274,29 +308,6 @@ export default function App() {
     return undefined;
   }, [gameMode, phase, currentPlayerIndex, players, drawAction, nextTurn]);
 
-  // Salvar pontuação no Supabase quando a partida terminar
-  useEffect(() => {
-    if (phase !== 'gameOver' || !user || scoreSaved || !isSupabase || !saveGameScore) return;
-
-    const humanPlayer = players.find(p => !p.isBot);
-    if (!humanPlayer) return;
-
-    const doSave = async () => {
-      const quality = getWaterQuality(humanPlayer.score);
-      await saveGameScore(
-        humanPlayer.score,
-        quality.category,
-        quality.diagnosis,
-        humanPlayer.hand?.length || 0
-      );
-      setScoreSaved(true);
-    };
-
-    doSave().catch(err => {
-      console.error('Falha ao salvar pontuação no Supabase:', err);
-    });
-  }, [phase, user, scoreSaved, players, isSupabase, saveGameScore]);
-
   const viewerSeat = serverMatch.state?.viewerSeat ?? -1;
   // Bots have no screen: during their turn the viewer keeps seeing their own hand.
   const firstHumanIndex = Math.max(players.findIndex(player => !player.isBot), 0);
@@ -308,10 +319,10 @@ export default function App() {
     if (inMatch && !window.confirm('Reiniciar vai descartar a expedição atual. Continuar?')) {
       return;
     }
-    clearSavedLocalMatch();
+    clearSavedMatch();
     serverMatch.reset();
     setPhase(targetPhase);
-  }, [inMatch, serverMatch]);
+  }, [inMatch, serverMatch, clearSavedMatch]);
 
   const leaveFinishedMatch = useCallback((targetPhase: GamePhase) => {
     serverMatch.reset();
@@ -322,7 +333,7 @@ export default function App() {
     if (inMatch && !window.confirm('Sair da conta vai descartar a expedição atual. Continuar?')) {
       return;
     }
-    clearSavedLocalMatch();
+    clearSavedMatch();
     serverMatch.reset();
     setPlayers([]);
     setCurrentPlayerIndex(0);
@@ -333,7 +344,7 @@ export default function App() {
     setActionMessage('');
     setLocalGame(null);
     await signOut();
-  }, [inMatch, serverMatch, signOut]);
+  }, [inMatch, serverMatch, signOut, clearSavedMatch]);
 
   const serverMatchForBoard = useMemo(() => ({
     loading: serverMatch.loading,
@@ -356,10 +367,10 @@ export default function App() {
 
   const installPrompt = <InstallPrompt paused={inMatch} />;
 
-  if (!user && !localMode) {
+  if (emailAction || (!user && !localMode)) {
     return (
       <>
-        <AuthScreen />
+        <AuthScreen onComplete={() => setEmailAction(false)} />
         {installPrompt}
       </>
     );
@@ -385,14 +396,14 @@ export default function App() {
             className="h-11 w-11 md:h-14 md:w-14 shrink-0"
           />
           <div className="min-w-0 hidden min-[420px]:block">
-            <h1 className="truncate text-base md:text-xl font-bold tracking-tight font-serif italic">Clube de Ciências Bona</h1>
-            <p className="text-xs text-ink-muted font-mono uppercase tracking-widest hidden sm:block">Bioindicadores & Impacto Ambiental</p>
+            <span className="block truncate text-base md:text-xl font-bold tracking-tight font-serif italic">Clube de Ciências Bona</span>
+            <p className="text-xs text-ink-muted font-mono uppercase tracking-widest hidden xl:block">Bioindicadores & Impacto Ambiental</p>
           </div>
         </button>
         <div className="shrink-0 flex gap-1.5 md:gap-4 items-center">
           <a
             href="https://clubedecienciasbona.com.br/"
-            className="hidden md:flex items-center gap-2 min-h-11 px-3 rounded-lg border border-border-strong text-xs font-bold text-ink-secondary hover:bg-surface-alt hover:text-ink transition-all"
+            className="hidden xl:flex items-center gap-2 min-h-11 px-3 rounded-lg border border-border-strong text-xs font-bold text-ink-secondary hover:bg-surface-alt hover:text-ink transition-all"
             target="_blank"
             rel="noopener noreferrer"
             title="Volte para o site principal"
@@ -438,7 +449,7 @@ export default function App() {
           )}
           {/* User info + Logout */}
           <div className={`${inMatch ? 'hidden md:flex' : 'flex'} items-center gap-2 border-l border-border pl-3 ml-1`}>
-              <div className="hidden md:block text-right">
+              <div className="hidden xl:block text-right">
                 <div className="text-xs font-bold font-serif italic leading-tight truncate max-w-[120px]">{profile?.full_name}</div>
               <div className="text-xs text-ink-muted font-mono truncate max-w-[120px]">{user?.email || 'Modo local'}</div>
             </div>
@@ -470,7 +481,7 @@ export default function App() {
             {phase === 'setup' && (
               <SetupPanel
                 gameMode={gameMode}
-                apiConfigured={isApiConfigured && !isSupabase}
+                apiConfigured={isApiConfigured}
                 onGameModeChange={setGameMode}
                 playerCount={numPlayers}
                 onPlayerCountChange={setNumPlayers}

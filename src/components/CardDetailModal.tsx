@@ -22,9 +22,14 @@ export default function CardDetailModal({ card, onClose }: CardDetailModalProps)
 
   useEffect(() => {
     if (!isOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     triggerRef.current = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
-    return () => triggerRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      triggerRef.current?.focus({ preventScroll: true });
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -60,7 +65,7 @@ export default function CardDetailModal({ card, onClose }: CardDetailModalProps)
     <AnimatePresence>
       {card && (
         <div
-          className="fixed inset-0 z-[100] flex overflow-y-auto p-4 bg-ink/75 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex overflow-y-auto overscroll-contain p-4 bg-ink/75 backdrop-blur-sm"
           onClick={onClose}
           role="dialog"
           aria-modal="true"

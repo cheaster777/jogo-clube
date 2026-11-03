@@ -89,6 +89,7 @@ export function useServerMatch({ enabled, phase, playerCount, playerNames }: Use
     setMatchId(null);
     setVersion(0);
     setState(null);
+    setLoading(false);
     setError(null);
     setJoinMatchId('');
   }, []);
@@ -122,6 +123,28 @@ export function useServerMatch({ enabled, phase, playerCount, playerNames }: Use
       if (generation === generationRef.current) pollInFlightRef.current = false;
     }
   }, [applySnapshot, matchId]);
+
+  // Only the server snapshot is restored: never trust a saved hand or version.
+  const resume = useCallback(async (id: string) => {
+    const generation = ++generationRef.current;
+    versionRef.current = 0;
+    pollInFlightRef.current = false;
+    setLoading(true);
+    setError(null);
+    setJoinMatchId(id);
+    try {
+      const snapshot = await apiClient.getMatch(id) as ServerMatchSnapshot;
+      if (generation !== generationRef.current) return;
+      applySnapshot(snapshot, generation, true);
+      setMatchId(id);
+    } catch (requestError) {
+      if (generation !== generationRef.current) return;
+      setError(requestError instanceof ApiError ? requestError.message : 'Não foi possível retomar a partida.');
+      throw requestError;
+    } finally {
+      if (generation === generationRef.current) setLoading(false);
+    }
+  }, [applySnapshot]);
 
   const start = useCallback(async () => {
     if (!isApiConfigured) {
@@ -246,6 +269,7 @@ export function useServerMatch({ enabled, phase, playerCount, playerNames }: Use
     reset,
     start,
     join,
+    resume,
     sendCommand,
   };
 }

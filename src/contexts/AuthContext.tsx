@@ -1,6 +1,5 @@
 import { useRef, createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ApiError, ApiProfile, ApiUser, apiClient, isApiConfigured, setUnauthorizedHandler, unwrapApiData } from '../lib/api';
-import { supabase, isSupabaseMode } from '../lib/supabase';
 
 export interface User {
   id: string;
@@ -43,7 +42,6 @@ interface AuthContextType {
   loading: boolean;
   localMode: boolean;
   authError: string | null;
-  isSupabase: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null; requiresEmailVerification?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
@@ -51,7 +49,6 @@ interface AuthContextType {
   resendEmailVerification: (email: string) => Promise<{ error: AuthError | null }>;
   confirmEmail: (token: string) => Promise<{ error: AuthError | null }>;
   confirmPasswordReset: (token: string, newPassword: string) => Promise<{ error: AuthError | null }>;
-  saveGameScore?: (score: number, qualityCategory: string, qualityDiagnosis: string, familiesCount: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -76,19 +73,6 @@ function normalizeProfile(profile: ApiProfile | null | undefined, user: ApiUser 
   return { ...profile, email: user.email };
 }
 
-async function loadSupabaseProfile(userId: string): Promise<Profile | null> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (data) return data as Profile;
-    if (attempt < 3) await new Promise(r => setTimeout(r, 800));
-  }
-  return null;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -96,31 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // ==========================================
-  // MODO 1: SUPABASE (Netlify em produção)
-  // ==========================================
-  if (isSupabaseMode) {
-    return (
-      <SupabaseAuthProvider
-        user={user}
-        setUser={setUser}
-        profile={profile}
-        setProfile={setProfile}
-        session={session}
-        setSession={setSession}
-        loading={loading}
-        setLoading={setLoading}
-        authError={authError}
-        setAuthError={setAuthError}
-      >
-        {children}
-      </SupabaseAuthProvider>
-    );
-  }
-
-  // ==========================================
-  // MODO 2: API PRÓPRIA (VPS Contabo em produção)
-  // ==========================================
   return (
     <ApiAuthProvider
       user={user}
@@ -140,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 // ----------------------------------------------------
-// Provedor para o backend Supabase (Netlify)
+// Estado compartilhado pelo provedor de autenticação
 // ----------------------------------------------------
 interface ProviderProps {
   children: ReactNode;
@@ -154,201 +113,6 @@ interface ProviderProps {
   setLoading: (l: boolean) => void;
   authError: string | null;
   setAuthError: (e: string | null) => void;
-}
-
-function SupabaseAuthProvider({
-  children,
-  user,
-  setUser,
-  profile,
-  setProfile,
-  session,
-  setSession,
-  loading,
-  setLoading,
-  authError,
-}: ProviderProps) {
-  useEffect(() => {
-    let mounted = true;
-    const timeout = setTimeout(() => {
-      if (mounted) setLoading(false);
-    }, 6000);
-
-    const init = async () => {
-      try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (!mounted) return;
-
-        if (currentSession?.user) {
-          const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-          if (!mounted) return;
-
-          if (userError || !currentUser) {
-            await supabase.auth.signOut();
-            if (mounted) {
-              setSession(null);
-              setUser(null);
-              setProfile(null);
-            }
-          } else {
-            setSession(currentSession as unknown as Session);
-            setUser((currentUser as unknown as User) ?? null);
-            const p = await loadSupabaseProfile(currentUser.id);
-            if (mounted) setProfile(p);
-          }
-        }
-      } catch (err) {
-        console.warn('Erro ao inicializar sessão Supabase:', err);
-      } finally {
-        if (mounted) setLoading(false);
-        clearTimeout(timeout);
-      }
-    };
-
-    init();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        if (!mounted) return;
-        setSession(newSession as unknown as Session);
-        setUser((newSession?.user as unknown as User) ?? null);
-
-        if (!newSession?.user) {
-          setProfile(null);
-          return;
-        }
-
-        const p = await loadSupabaseProfile(newSession.user.id);
-        if (mounted) {
-          if (p) {
-            setProfile(p);
-          } else {
-            // Criação de perfil de fallback caso a trigger tenha atrasado
-            const u = newSession.user;
-            await supabase.from('profiles').insert({
-              id: u.id,
-              full_name: u.user_metadata?.full_name ?? u.email ?? 'Cientista',
-              email: u.email ?? '',
-            });
-            const retry = await loadSupabaseProfile(u.id);
-            if (mounted) setProfile(retry);
-          }
-        }
-      }
-    );
-
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    });
-    if (error) return { error: { message: error.message, code: error.name } };
-    if (data.user) {
-      setUser(data.user as unknown as User);
-    }
-    return { error: null };
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) return { error: { message: error.message, code: error.name } };
-    if (data.user) {
-      setUser(data.user as unknown as User);
-      const p = await loadSupabaseProfile(data.user.id);
-      setProfile(p);
-    }
-    return { error: null };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSession(null);
-  };
-
-  const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-    });
-    if (error) return { error: { message: error.message, code: error.name } };
-    return { error: null };
-  };
-
-  const resendEmailVerification = async (email: string) => {
-    const { error } = await supabase.auth.resend({ type: 'signup', email });
-    if (error) return { error: { message: error.message, code: error.name } };
-    return { error: null };
-  };
-
-  const confirmEmail = async (token: string) => {
-    const { error } = await supabase.auth.verifyOtp({ token_hash: token, type: 'email' });
-    if (error) return { error: { message: error.message, code: error.name } };
-    return { error: null };
-  };
-
-  const confirmPasswordReset = async (_token: string, newPassword: string) => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) return { error: { message: error.message, code: error.name } };
-    return { error: null };
-  };
-
-  const saveGameScore = async (
-    score: number,
-    qualityCategory: string,
-    qualityDiagnosis: string,
-    familiesCount: number
-  ) => {
-    if (!user) return;
-    const { error } = await supabase.from('game_scores').insert({
-      user_id: user.id,
-      score,
-      quality_category: qualityCategory,
-      quality_diagnosis: qualityDiagnosis,
-      families_count: familiesCount,
-    });
-    if (error) {
-      console.error('Falha ao salvar pontuação no Supabase:', error.message);
-      throw new Error(error.message);
-    }
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        session,
-        loading,
-        localMode: false,
-        authError,
-        isSupabase: true,
-        signUp,
-        signIn,
-        signOut,
-        resetPassword,
-        resendEmailVerification,
-        confirmEmail,
-        confirmPasswordReset,
-        saveGameScore,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
 }
 
 // ----------------------------------------------------
@@ -502,6 +266,11 @@ function ApiAuthProvider({
   const confirmPasswordReset = async (token: string, newPassword: string) => {
     try {
       await apiClient.confirmPasswordReset(token, newPassword);
+      // Reset revokes the target account's sessions. A link may also belong to
+      // another account, so refresh our session instead of assuming its owner.
+      if (user) {
+        try { applyAuthResponse(await apiClient.getMe()); } catch { /* A 401 already clears the session globally. */ }
+      }
       return { error: null };
     } catch (error) {
       return { error: toApiError(error) };
@@ -517,7 +286,6 @@ function ApiAuthProvider({
         loading,
         localMode,
         authError,
-        isSupabase: false,
         signUp,
         signIn,
         signOut,
